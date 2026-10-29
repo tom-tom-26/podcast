@@ -1,0 +1,11 @@
+# Audio never goes in git; it lives in GitHub Releases.
+*.wav
+*.m4a
+*.mp3
+
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.import_linter_cache/

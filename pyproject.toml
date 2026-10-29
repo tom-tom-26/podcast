@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pipeline"
+version = "0.1.0"
+description = "Turns Plainly Put Bundles into published Episodes and an updated Feed."
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "import-linter>=2.1",
+    "pre-commit>=4",
+    "pytest>=8",
+    "ruff==0.17.3"  # keep in step with .pre-commit-config.yaml,
+]
+
+[project.scripts]
+pipeline = "pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pipeline*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.importlinter]
+# Every top-level package in the repo goes here and in source_modules below.
+root_packages = ["pipeline", "tests"]
+
+[[tool.importlinter.contracts]]
+name = "Only the pipeline package imports its private library"
+type = "forbidden"
+source_modules = ["tests"]
+forbidden_modules = ["pipeline._lib"]
