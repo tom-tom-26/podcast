@@ -88,7 +88,7 @@ jobs:
           path: whisper
           key: faster-whisper-base.en
       - name: Find the engines
-        id: engine
+        id: engines
         run: |
           engines=""
           for dir in $DIRS; do
@@ -99,17 +99,17 @@ jobs:
           echo "engines=$engines" >> "$GITHUB_OUTPUT"
         env:
           DIRS: ${{ steps.bundle.outputs.dirs }}
-      - if: contains(steps.engine.outputs.engines, 'kokoro')
+      - if: contains(steps.engines.outputs.engines, 'kokoro')
         run: |
           pip install -e ".[kokoro]"
           if pip show torch > /dev/null 2>&1; then
             echo "::error::PyTorch got installed for a Kokoro run"
             exit 1
           fi
-      - if: contains(steps.engine.outputs.engines, 'pocket')
+      - if: contains(steps.engines.outputs.engines, 'pocket')
         run: pip install -e ".[pocket]" --extra-index-url https://download.pytorch.org/whl/cpu
       - name: Restore the Pocket model and voices
-        if: contains(steps.engine.outputs.engines, 'pocket')
+        if: contains(steps.engines.outputs.engines, 'pocket')
         uses: actions/cache@v6
         with:
           path: |
@@ -117,14 +117,14 @@ jobs:
             ~/.cache/pocket_tts
           key: pocket-tts-4.0.1
       - name: Restore the Kokoro model
-        if: contains(steps.engine.outputs.engines, 'kokoro')
+        if: contains(steps.engines.outputs.engines, 'kokoro')
         id: models
         uses: actions/cache@v6
         with:
           path: models
           key: kokoro-v1.0-int8
       - name: Download the Kokoro model
-        if: contains(steps.engine.outputs.engines, 'kokoro') && steps.models.outputs.cache-hit != 'true'
+        if: contains(steps.engines.outputs.engines, 'kokoro') && steps.models.outputs.cache-hit != 'true'
         run: |
           mkdir -p models
           base=https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0

@@ -72,9 +72,12 @@ def main(
         for bundle_id in bundle_ids
     ]
     gate = functools.partial(
-        _encode_and_gate, repo=args.repo, transcribe=transcribe, encode=encode,
+        _encode_and_gate,
+        repo=args.repo,
+        transcribe=transcribe,
+        encode=encode,
         synthesise=synthesise,
-    )  # fmt: skip
+    )
     if args.dry_run:
         passed = [
             gate(bundle, wav, out / f"{bundle.name}.m4a", bundle.name)
@@ -83,7 +86,7 @@ def main(
         if not all(passed):
             return 1
         print(
-            f"publish {name}: dry run, encoded and gated {len(passed)} in "
+            f"publish {name}: dry run, encoded and gated {len(passed)} Bundles in "
             f"{time.perf_counter() - started:.1f} s",
             file=sys.stderr,
         )
@@ -110,12 +113,12 @@ def main(
         print(f"publish {name}: {error}; nothing published", file=sys.stderr)
         return 1
     ids = [episode_id(n, b) for n, b in zip(numbers, bundle_ids, strict=True)]
-    m4as = [out / f"{i}.m4a" for out, i in zip(out_dirs, ids, strict=True)]
+    m4as = [out / f"{episode}.m4a" for out, episode in zip(out_dirs, ids, strict=True)]
 
     # Every Part is gated before any Release exists, so one failing Part publishes none.
     reports = [
-        gate(bundle, wav, m4a, i)
-        for bundle, wav, m4a, i in zip(args.bundle, args.wav, m4as, ids, strict=True)
+        gate(bundle, wav, m4a, episode)
+        for bundle, wav, m4a, episode in zip(args.bundle, args.wav, m4as, ids, strict=True)
     ]
     if not all(reports):
         if len(ids) > 1:
@@ -124,22 +127,22 @@ def main(
 
     roster = load_roster(args.repo)
     releases = []
-    for bundle, meta, number, i, m4a, report in zip(
+    for bundle, meta, number, episode, m4a, report in zip(
         args.bundle, metas, numbers, ids, m4as, reports, strict=True
     ):
         notes = with_credit(
             (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, meta["voice"]
         )
-        release = github.create_release(i, f"Episode {number}: {meta['title']}", notes)
+        release = github.create_release(episode, f"Episode {number}: {meta['title']}", notes)
         github.upload_asset(release, m4a)
         github.upload_asset(release, report)
         releases.append(release)
-    for release, i, m4a, report in zip(releases, ids, m4as, reports, strict=True):
+    for release, episode, m4a, report in zip(releases, ids, m4as, reports, strict=True):
         uploaded = github.asset_sizes(release)
         for asset in (m4a, report):
             if uploaded.get(asset.name) != asset.stat().st_size:
                 print(
-                    f"publish {i}: draft Release has {asset.name} at "
+                    f"publish {episode}: draft Release has {asset.name} at "
                     f"{uploaded.get(asset.name)} bytes but the local file is "
                     f"{asset.stat().st_size}; nothing published and the registry is unchanged",
                     file=sys.stderr,
@@ -149,11 +152,13 @@ def main(
         github.publish_release(release)
     print(f"publish {' '.join(ids)}: Releases published, upload sizes checked", file=sys.stderr)
 
-    for bundle_id, meta, number, i, m4a in zip(bundle_ids, metas, numbers, ids, m4as, strict=True):
+    for bundle_id, meta, number, episode, m4a in zip(
+        bundle_ids, metas, numbers, ids, m4as, strict=True
+    ):
         episodes.append(
             {
                 "number": number,
-                "episode_id": i,
+                "episode_id": episode,
                 "bundle_id": bundle_id,
                 "guid": str(uuid.uuid4()),
                 "voice": meta["voice"],

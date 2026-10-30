@@ -134,10 +134,10 @@ def main(args: argparse.Namespace, github=None) -> int:
 def _publish_groups(bundle_ids: list[str], repo: Path) -> list[str]:
     """One publish-episode input per Episode: a Bundle id, or the Bundle ids of every Part of
     a topic in Part order, since Parts publish together or not at all."""
-    groups: dict[str, list[tuple[int, str]]] = {}
+    groups: dict[tuple[str, str], list[tuple[int, str]]] = {}
     for bundle_id in bundle_ids:
         part = load_meta(repo / "bundles" / bundle_id).get("part")
-        key = f"part {part['series_slug']}" if part else bundle_id
+        key = ("topic", part["series_slug"]) if part else ("bundle", bundle_id)
         groups.setdefault(key, []).append((part["n"] if part else 1, bundle_id))
     return [" ".join(bundle_id for _, bundle_id in sorted(group)) for group in groups.values()]
 

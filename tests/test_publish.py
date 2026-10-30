@@ -607,7 +607,7 @@ def test_a_qa_on_a_part_takes_the_topic_number(smoke_bundle, tmp_path):
 
 def test_after_z_qa_letters_run_z2_z3(smoke_bundle, tmp_path):
     github = FakeGitHub()
-    taken = ["1", *"qrstuvwxyz", "z2"]
+    taken = ["1", *(f"1{letter}" for letter in "qrstuvwxyz"), "1z2"]
     github.files["episodes.yaml"] = yaml.safe_dump(
         {"episodes": [{"number": n, "episode_id": f"ep-001{n[1:]}-x", "bundle_id": f"b{n}"}
                       for n in taken]}

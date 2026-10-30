@@ -39,7 +39,9 @@ def number_episodes(metas: list[dict], episodes: list[dict]) -> list[str]:
         # A Q&A on a Part, or on another Q&A, hangs off the topic number (4q).
         topic = re.match(r"\d+", found[0])[0]
         asked = sum(bool(re.fullmatch(rf"{topic}[q-z]\d*", e["number"])) for e in episodes)
-        letter = QA_LETTERS[asked] if asked < len(QA_LETTERS) else f"z{asked - 8}"
+        # The eleventh Q&A is z2, the twelfth z3.
+        extra = asked - len(QA_LETTERS) + 2
+        letter = QA_LETTERS[asked] if asked < len(QA_LETTERS) else f"z{extra}"
         return [topic + letter]
     number = next_number(episodes)
     parts = [meta.get("part") for meta in metas]
@@ -48,13 +50,13 @@ def number_episodes(metas: list[dict], episodes: list[dict]) -> list[str]:
             raise NumberingError("only the Parts of one topic publish together")
         return [str(number)]
     if not all(parts) or len({p["series_slug"] for p in parts}) > 1:
-        raise NumberingError("a group must be every Part of one series and nothing else")
+        raise NumberingError("a group must be every Part of one topic and nothing else")
     total = parts[0]["of"]
     if sorted(p["n"] for p in parts) != list(range(1, total + 1)) or any(
         p["of"] != total for p in parts
     ):
         raise NumberingError(
-            f"Parts {sorted(p['n'] for p in parts)} of {total} of {parts[0]['series_slug']}: "
+            f"Parts {sorted(p['n'] for p in parts)} of {total} of topic {parts[0]['series_slug']}: "
             "every Part publishes in one group, all or nothing"
         )
     return [f"{number}{PART_LETTERS[p['n'] - 1]}" for p in parts]
