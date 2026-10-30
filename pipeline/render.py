@@ -13,7 +13,7 @@ import yaml
 
 from pipeline._lib.bundle import load_meta
 from pipeline._lib.lexicon import load_lexicon
-from pipeline._lib.pacing import draw_gap, load_pacing, plan_chunks
+from pipeline._lib.pacing import draw_gap, draw_speed, load_pacing, plan_chunks
 from pipeline._lib.roster import load_roster
 from pipeline._lib.script import parse_script
 from pipeline._lib.synthesise import RATE, kokoro_lang, synthesise
@@ -36,7 +36,6 @@ def main(args: argparse.Namespace) -> int:
 
 
 def chunk_map_path(wav: Path) -> Path:
-    """Where render writes the chunk map for a WAV."""
     return wav.with_suffix(".chunks.yaml")
 
 
@@ -63,7 +62,7 @@ def render_bundle(
     rng = random.Random(bundle.name)
     for chunk in plan:
         chunk["gap_seconds"] = draw_gap(rng, pacing["gaps"][chunk["gap"]]) if chunk["gap"] else 0
-        chunk["speed"] = _draw_speed(rng, roster[voice], pacing)
+        chunk["speed"] = draw_speed(rng, roster[voice], pacing)
     timeline: list[np.ndarray] = []
     at = 0
     for index, chunk in enumerate(plan):
@@ -102,7 +101,7 @@ def rerender_chunk(
     # Seeded by the retry count too, so a retry is repeatable but never the first draw again.
     chunk["retries"] = chunk.get("retries", 0) + 1
     rng = random.Random(f"{bundle.name}:{index}:{chunk['retries']}")
-    chunk["speed"] = _draw_speed(rng, roster[meta["voice"]], pacing)
+    chunk["speed"] = draw_speed(rng, roster[meta["voice"]], pacing)
     say = _speaker(bundle, repo, meta, roster[meta["voice"]], pacing, synthesise)
     audio = say(index, chunk["text"], chunk["speed"])
     with wave.open(str(wav)) as old:
@@ -138,11 +137,6 @@ def _speaker(bundle, repo, meta, voice_settings, pacing, synthesise):
             ) from error
 
     return say
-
-
-def _draw_speed(rng: random.Random, voice_settings: dict, pacing: dict) -> float:
-    jitter = pacing["speed_jitter"]
-    return voice_settings.get("speed", 1.0) + rng.uniform(-jitter, jitter)
 
 
 def _trim(audio: np.ndarray, trim: dict) -> np.ndarray:

@@ -9,6 +9,7 @@ from tests.conftest import SMOKE_BUNDLE
 from tests.test_lint import REPO
 
 RATE = 24000
+PACING = yaml.safe_load((REPO / "config" / "pacing.yaml").read_text(encoding="utf-8"))
 
 
 class FakeEngine:
@@ -68,9 +69,7 @@ def test_writes_a_24_khz_mono_wav_with_the_think_pause(smoke_bundle, tmp_path):
 
 
 def longest_silence(samples):
-    silent = np.concatenate([[False], samples == 0, [False]])
-    edges = np.flatnonzero(np.diff(silent.astype(np.int8)))
-    return max(np.diff(edges)[::2], default=0)
+    return max(silences(samples), default=0)
 
 
 def test_sentences_in_a_paragraph_share_a_chunk_up_to_the_cap(smoke_bundle, tmp_path):
@@ -88,7 +87,7 @@ def test_sentences_in_a_paragraph_share_a_chunk_up_to_the_cap(smoke_bundle, tmp_
     long = [text for text in texts if sentence in text]
     assert sum(text.count(sentence) for text in long) == 12
     assert len(long) < 12
-    assert all(len(text) <= 300 for text in long)
+    assert all(len(text) <= PACING["chunk_cap"] for text in long)
 
 
 def test_gaps_between_chunks_vary(smoke_bundle, tmp_path):
@@ -128,7 +127,7 @@ def silences(samples):
 
 
 def chunk_map(wav):
-    return wav.with_suffix(".chunks.yaml")
+    return render.chunk_map_path(wav)
 
 
 def test_each_chunk_gets_the_voice_base_speed_with_a_little_jitter(smoke_bundle, tmp_path):
@@ -137,7 +136,7 @@ def test_each_chunk_gets_the_voice_base_speed_with_a_little_jitter(smoke_bundle,
 
     engine, _ = render_smoke(smoke_bundle, tmp_path)
 
-    assert all(abs(speed - base) <= 0.025 for speed in engine.speeds)
+    assert all(abs(speed - base) <= PACING["speed_jitter"] for speed in engine.speeds)
     assert len(set(engine.speeds)) == len(engine.speeds)
 
 
@@ -189,3 +188,20 @@ def test_one_chunk_re_renders_with_a_fresh_speed_and_the_rest_untouched(smoke_bu
     assert (new[after[5]["start"] :] == old[before[5]["start"] :]).all()
     for b, a in zip(before, after, strict=True):
         assert a["end"] - a["start"] == b["end"] - b["start"] or a is after[4]
+
+
+def think_pause_after(bundle, tmp_path, paragraph):
+    (bundle / "script.md").write_text(
+        f"## Hook\n\n{paragraph} [think] Now the answer.\n", encoding="utf-8"
+    )
+    _, wav = render_smoke(bundle, tmp_path)
+    return max(silences(read_samples(wav))) / RATE
+
+
+def test_a_why_question_gets_a_longer_think_pause(smoke_bundle, tmp_path):
+    assert think_pause_after(smoke_bundle, tmp_path, 'So why does ice float?"') >= 4.2
+
+
+def test_a_one_fact_question_after_an_earlier_why_gets_the_short_think(smoke_bundle, tmp_path):
+    paragraph = "Why do people guess wrong? Here is a simpler one. What colour is grass?"
+    assert think_pause_after(smoke_bundle, tmp_path, paragraph) <= 3.4

@@ -10,7 +10,9 @@ import yaml
 from pipeline._lib.script import Pause, Segment
 
 PACING = Path("config") / "pacing.yaml"
-SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+CLOSING_QUOTES = "\"'”’"
+SENTENCE_END = re.compile(rf"(?<=[.!?])\s+|(?<=[.!?][{CLOSING_QUOTES}])\s+")
+WHY = re.compile(r"\bwhy\b", re.IGNORECASE)
 
 
 def load_pacing(repo: Path) -> dict:
@@ -60,7 +62,14 @@ def _stronger(gap: str | None, kind: str) -> str:
 
 
 def _asks_why(text: str) -> bool:
-    return any(s.lower().startswith("why") and s.endswith("?") for s in SENTENCE_END.split(text))
+    """Whether the question the chunk ends on is a why question, as in "So why...?"."""
+    questions = [s for s in SENTENCE_END.split(text) if s.rstrip(CLOSING_QUOTES).endswith("?")]
+    return bool(questions) and bool(WHY.search(questions[-1]))
+
+
+def draw_speed(rng: random.Random, voice_settings: dict, pacing: dict) -> float:
+    jitter = pacing["speed_jitter"]
+    return voice_settings.get("speed", 1.0) + rng.uniform(-jitter, jitter)
 
 
 def draw_gap(rng: random.Random, gap: dict) -> float:
