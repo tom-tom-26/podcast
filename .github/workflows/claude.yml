@@ -2,7 +2,7 @@ name: claude
 
 # The fallback for when cloud sessions are down: the owner opens an issue labelled episode from
 # the GitHub app, Claude comments the confirm message, and the owner's "@claude go" reply starts
-# a second run that writes the Bundle. Build tickets never mention @claude, so they never start it.
+# a second run that writes the Bundle. Build tickets carry no episode label, so they never start it.
 on:
   issues:
     types: [labeled]
@@ -23,10 +23,12 @@ jobs:
         && github.event.sender.login == github.repository_owner)
       || (github.event_name == 'issue_comment'
         && !github.event.issue.pull_request
+        && contains(github.event.issue.labels.*.name, 'episode')
         && github.event.comment.user.login == github.repository_owner
         && contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
-    # A research run is estimated at 20-45 runner minutes (research/13 section 4).
+    # A research run is estimated at 20-45 runner minutes (research/13 section 4); the rest is
+    # room for a slow source, until the first runs give a measured time.
     timeout-minutes: 75
     concurrency:
       group: claude-${{ github.event.issue.number }}
@@ -38,6 +40,9 @@ jobs:
       issues: write
       pull-requests: write
       id-token: write
+    env:
+      # The Skill runs pip install; network steps retry at most twice.
+      PIP_RETRIES: "2"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -54,9 +59,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          label_trigger: episode
-          # Keeps tag mode, with its one comment that Claude updates, on the labelled event too,
-          # where a prompt alone would switch to agent mode.
+          # Keeps tag mode, with its one comment that Claude updates, where a prompt alone would
+          # switch to agent mode. The job's if is the only trigger filter: with a prompt set, the
+          # action skips its own label and phrase checks.
           track_progress: true
           claude_args: >-
             --allowedTools "Skill,Bash,Read,Write,Edit,Glob,Grep,WebSearch,WebFetch"
@@ -74,7 +79,8 @@ jobs:
               feedback) goes straight to its own steps.
 
             At step 6, commit on the branch you are on: it is already a claude/ branch made
-            from main, so skip `git checkout -b` and the rebase. Lint, push, then open the PR
+            from main, so skip only `git checkout -b`. Then fetch, rebase, lint and push as
+            step 6 says; the branch is unpushed until then, so the rebase is safe. Open the PR
             with the `gh api` call step 6 gives, with head set to this branch and "Closes
             #${{ github.event.issue.number }}" as the last line of the body. Don't post a
             "Create a PR" link instead: auto-merge only sees a PR that exists. The final
