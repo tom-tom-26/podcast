@@ -179,12 +179,20 @@ HETERONYMS = re.compile(
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
+def _has_think(segments: list[Segment]) -> bool:
+    return any(
+        isinstance(piece, Pause) and piece.kind == "think"
+        for segment in segments
+        for paragraph in segment.paragraphs
+        for piece in paragraph
+    )
+
+
 def style_warnings(
-    segments: list[Segment], variant: str | None, lexicon: Lexicon, questions: list | None
+    segments: list[Segment], variant: str | None, lexicon: Lexicon, questions: list[str] | None
 ) -> list[str]:
-    """research/05 section 8's mechanical soft items, as warnings. `questions` is set for a
-    Q&A, which has its own shape (ticket 11): no Roadmap, a Segment per question and one
-    Recall prompt for the whole Episode."""
+    """research/05 section 8's mechanical soft items, as warnings. `questions` is a Q&A's
+    list, since a Q&A has its own shape (ticket 11)."""
     warnings = []
     titles = [segment.title for segment in segments]
     if questions:
@@ -198,12 +206,7 @@ def style_warnings(
                 f"script.md: {answers} content Segments for {len(questions)} question"
                 f"{'' if len(questions) == 1 else 's'} in meta.yaml (aim for one each)"
             )
-        if not any(
-            isinstance(piece, Pause) and piece.kind == "think"
-            for segment in segments
-            for paragraph in segment.paragraphs
-            for piece in paragraph
-        ):
+        if not _has_think(segments):
             warnings.append("script.md: a Q&A has no [think] for its Recall prompt")
     elif titles[:2] != ["Hook", "Roadmap"] or titles[-2:] != ["Recap", "Sign-off"]:
         warnings.append(
@@ -236,15 +239,7 @@ def style_warnings(
                 for s in sentences
                 if len(s.split()) > SENTENCE_WORDS
             ]
-        if (
-            not questions
-            and CONTENT_SEGMENT.match(segment.title)
-            and not any(
-                isinstance(piece, Pause) and piece.kind == "think"
-                for paragraph in segment.paragraphs
-                for piece in paragraph
-            )
-        ):
+        if not questions and CONTENT_SEGMENT.match(segment.title) and not _has_think([segment]):
             warnings.append(f"{where}: content Segment has no [think] for its Recall prompt")
         text = " ".join(spoken)
         for name, mark in PER_SEGMENT.items():

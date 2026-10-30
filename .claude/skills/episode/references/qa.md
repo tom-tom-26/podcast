@@ -68,11 +68,9 @@ Lint knows this shape. It warns, without blocking, if a Q&A has no `[think]` or 
 
 ## Listener profile
 
-After the Bundle is written, append one observation line under `## Observations` in `config/listener_profile.md`, saying what the questions show about the owner's taste: how much detail they wanted, and where their curiosity went. It goes in the same commit as the Bundle (`git add config/listener_profile.md`). The format is in the file's header.
+After the Bundle is written, append one observation line under `## Observations` in `config/listener_profile.md`, saying what the questions show about the owner's taste: how much detail they wanted, and where their curiosity went. It goes in the same commit as the Bundle (`git add config/listener_profile.md`). The header gives the line format and the size limit, and how to merge old observations when the profile passes it.
 
 When about 3 observations point the same way, propose a default change at the end of the final message, under **Proposed defaults**, such as "go one level deeper on mechanisms in health Episodes". Never apply it yourself. With the owner's OK, a later run writes it under `## Agreed defaults`.
-
-When the profile grows past about 500 tokens, merge the oldest observations into one summary line under `## Summary`, keeping their Episode references.
 
 ## Final message
 
