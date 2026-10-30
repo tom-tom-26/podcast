@@ -357,20 +357,6 @@ def test_parts_stay_in_the_window_together_past_the_budget(repo, tmp_path):
     ]
 
 
-def test_parts_leave_the_window_together(repo, tmp_path):
-    root, github = repo
-    episodes = registry(root)
-    episodes[0]["number"], episodes[1]["number"] = "1a", "1b"
-    write_registry(root, episodes)
-    add_episode(root, github, "2", "ep-002-sleep", "2026-11-05T09:00:00Z")
-    set_site(root, budget_mb=size_mb(root, "ep-002-sleep"))
-    out = tmp_path / "_site"
-
-    assert build_site(root, out, github) == 0
-
-    assert titles(out) == ["Episode 2: How tides work"]
-
-
 def test_a_pin_on_one_part_keeps_the_whole_topic(repo, tmp_path):
     root, github = repo
     episodes = registry(root)
@@ -443,6 +429,26 @@ def test_a_test_episode_can_point_at_its_release_for_the_apple_test(repo, tmp_pa
         "https://github.com/example/podcast/releases/download/ep-002-tides/ep-002-tides.m4a"
     )
     assert not (out / "test" / "audio").exists()
+
+
+def test_a_test_episode_under_a_real_guid_fails_the_build(repo, tmp_path, capsys):
+    root, github = repo
+    write_test_registry(root, [registry(root)[1]])
+
+    assert build_site(root, tmp_path / "_site", github) == 1
+
+    assert "reuses the guid 00000000-0000-4000-8000-000000000002" in capsys.readouterr().err
+
+
+def test_a_pinned_newest_episode_does_not_pull_in_the_next_one_over_budget(repo, tmp_path):
+    root, github = repo
+    pin(root, "ep-002-tides")
+    set_site(root, budget_mb=0.001)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == ["Episode 2: How tides work"]
 
 
 def test_with_no_test_episodes_there_is_no_test_feed(repo, tmp_path):

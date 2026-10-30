@@ -18,21 +18,27 @@ def choose_window(episodes: list[dict], pins: list[str], budget: float) -> list[
     groups: dict[str, list[dict]] = {}
     for episode in episodes:
         groups.setdefault(_topic(episode["number"]), []).append(episode)
-    kept = [group for group in groups.values() if any(e["episode_id"] in pins for e in group)]
+    newest = list(groups.values())[-1:]
+    # The newest Episode stays even when pins fill the budget: it was just published, and the
+    # budget is soft.
+    kept = [
+        group
+        for group in groups.values()
+        if group in newest or any(e["episode_id"] in pins for e in group)
+    ]
     total = sum(e["bytes"] for group in kept for e in group)
-    unpinned = [group for group in reversed(groups.values()) if group not in kept]
-    for at, group in enumerate(unpinned):
-        # The newest Episode stays even when pins fill the budget: it was just published, and
-        # the budget is soft. A group that crosses the budget stays whole.
-        if at > 0 and total >= budget:
+    for group in reversed(groups.values()):
+        if total >= budget:
             break
-        kept.append(group)
-        total += sum(e["bytes"] for e in group)
+        if group not in kept:
+            # A group that crosses the budget stays whole.
+            kept.append(group)
+            total += sum(e["bytes"] for e in group)
     window = [e for group in kept for e in group]
     return [e for e in episodes if e in window]
 
 
 def _topic(number: str) -> str:
-    # Parts carry a-c after the topic number; Q&As (4q, 7z2) are Episodes of their own.
+    # Parts take letters from a (4a, 4b); Q&As take them from q (7q, 7z2) and stand alone.
     part = re.fullmatch(r"(\d+)[a-p]", number)
     return part[1] if part else number

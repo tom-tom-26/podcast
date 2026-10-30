@@ -47,7 +47,8 @@ def main(args: argparse.Namespace, github=None) -> int:
     tests = load_registry((args.repo / TEST_REGISTRY).read_text(encoding="utf-8"))
     rules = yaml.safe_load((args.repo / "config" / "site.yaml").read_text(encoding="utf-8"))
     pins = load_pins(args.repo / PIN_LIST)
-    window = choose_window(episodes, pins, rules["budget_mb"] * MB)
+    budget = rules["budget_mb"] * MB
+    window = choose_window(episodes, pins, budget)
     in_feed = episodes if rules["repoint"] else window
     if args.check:
         feeds = {"feed.xml": in_feed} | ({TEST_FEED: tests} if tests else {})
@@ -74,7 +75,7 @@ def main(args: argparse.Namespace, github=None) -> int:
             print(f"site: pinned {pin} is not in the registry; ignored", file=sys.stderr)
     window_bytes = sum(episode["bytes"] for episode in window)
     dropped = [episode["episode_id"] for episode in episodes if episode not in window]
-    if dropped or window_bytes > rules["budget_mb"] * MB:
+    if dropped or window_bytes > budget:
         print(
             f"site: warning: the Window is {window_bytes / MB:.1f} MB against a "
             f"{rules['budget_mb']} MB budget; dropped {', '.join(dropped) or 'nothing'}"
@@ -85,11 +86,7 @@ def main(args: argparse.Namespace, github=None) -> int:
     # A Feed item's audio is a copy on the site, or else the Release download URL, which is
     # stable; it redirects to a signed URL that expires, which must never go in a Feed.
     fetch = [(episode, f"audio/{episode['file']}") for episode in window]
-    fetch += [
-        (episode, f"test/audio/{episode['file']}")
-        for episode in tests
-        if episode.get("enclosure") != "release"
-    ]
+    fetch += [(e, f"test/audio/{e['file']}") for e in tests if not _on_release(e)]
     for episode, path in fetch:
         (args.out / path).parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -101,8 +98,10 @@ def main(args: argparse.Namespace, github=None) -> int:
                 file=sys.stderr,
             )
             return 1
+    fetched_bytes = sum(episode["bytes"] for episode, _ in fetch)
     print(
-        f"site: fetched {len(fetch)} audio files in {time.perf_counter() - started:.1f} s",
+        f"site: fetched {len(fetch)} audio files, {fetched_bytes / MB:.1f} MB, "
+        f"in {time.perf_counter() - started:.1f} s",
         file=sys.stderr,
     )
 
@@ -142,9 +141,9 @@ def main(args: argparse.Namespace, github=None) -> int:
     (args.out / "archive.html").write_text(archive_html(show, items), encoding="utf-8")
     (args.out / "robots.txt").write_text(ROBOTS, encoding="utf-8")
     shutil.copy(args.repo / show["artwork"], args.out / "cover.png")
-    repointed = {release_url(e) for e in in_feed if e not in window}
+    repointed_urls = {release_url(e) for e in in_feed if e not in window}
     problems = cover_problems(args.out / "cover.png") + feed_problems(
-        feed, base, args.out, repointed
+        feed, base, args.out, repointed_urls
     )
 
     if tests:
@@ -152,7 +151,7 @@ def main(args: argparse.Namespace, github=None) -> int:
             item(
                 episode,
                 release_url(episode)
-                if episode.get("enclosure") == "release"
+                if _on_release(episode)
                 else f"{base}/test/audio/{episode['file']}",
                 title_prefix="TEST ",
             )
@@ -161,10 +160,17 @@ def main(args: argparse.Namespace, github=None) -> int:
         test_feed = build_feed({**show, "title": f"TEST {show['title']}"}, base, test_items)
         (args.out / TEST_FEED).parent.mkdir(exist_ok=True)
         (args.out / TEST_FEED).write_text(test_feed, encoding="utf-8")
-        released = {release_url(e) for e in tests if e.get("enclosure") == "release"}
+        test_release_urls = {release_url(e) for e in tests if _on_release(e)}
         problems += [
             f"{TEST_FEED}: {problem}"
-            for problem in feed_problems(test_feed, base, args.out, released)
+            for problem in feed_problems(test_feed, base, args.out, test_release_urls)
+        ]
+        # A test item under a real guid would stand in for that Episode in a listener's app.
+        real = {episode["guid"] for episode in episodes}
+        problems += [
+            f"{TEST_FEED}: {e['episode_id']} reuses the guid {e['guid']} of a real Episode"
+            for e in tests
+            if e["guid"] in real
         ]
 
     site_bytes = sum(f.stat().st_size for f in args.out.rglob("*") if f.is_file())
@@ -182,6 +188,11 @@ def main(args: argparse.Namespace, github=None) -> int:
         file=sys.stderr,
     )
     return 1 if problems else 0
+
+
+def _on_release(test_episode: dict) -> bool:
+    # For the Apple test: the item points at its Release, not a copy on the site.
+    return test_episode.get("enclosure") == "release"
 
 
 def cover_problems(png: Path) -> list[str]:
