@@ -38,6 +38,19 @@ Also:
 - Build tickets never contain `@claude`.
 - Never link the Feed from the README or any other page a search engine might index.
 
+## Finishing a build ticket
+
+When a session closes a build ticket (not an Episode run), end its report with:
+
+1. A short summary of what the ticket delivered, what was run to check it, and anything left for the owner.
+2. The build ticket table, built from live GitHub state (`gh issue list --state all --limit 100 --json number,title,state,body`), not from memory or `.scratch/`. One row per build ticket, in issue order, with these columns:
+   - `#`: the issue number.
+   - `Title`.
+   - `Blocked by`: issue numbers from the "Blocked by" line, or `—`.
+   - `Status`: `done` (closed), `ready` (open, every blocker closed), `blocked` (open, a blocker still open) or `owner` (labelled `ready-for-human`).
+   - `What it delivers`: one or two lines drawn from the issue's "What to build".
+3. One line naming what to pick up next: the lowest-numbered `ready` issue, plus any other `ready` ones.
+
 ## Commands
 
 ```
