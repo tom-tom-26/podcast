@@ -1,0 +1,32 @@
+# The pacing config: how render cuts a Script into chunks and spaces them (research/18 5.4,
+# amended by ticket 09). Every value is a soft default to tune by ear. Draws are seeded by the
+# Bundle id, so a re-render sounds the same.
+
+# Sentences in a paragraph are packed into one chunk up to this many characters. A sentence
+# longer than the cap goes alone.
+chunk_cap: 300
+
+# Gaps the Pipeline draws, in seconds. The model owns the gaps between sentences in a chunk.
+# lognormal: median and geometric SD factor; uniform: low and high. Draws are clipped to clip.
+gaps:
+  # Between two chunks of one paragraph, where the cap split it.
+  chunk: {lognormal: [0.38, 1.3], clip: [0.22, 0.65]}
+  paragraph: {lognormal: [0.75, 1.25], clip: [0.55, 1.10]}
+  segment: {uniform: [1.3, 1.7], clip: [1.2, 1.9]}
+  beat: {uniform: [0.8, 1.1], clip: [0.8, 1.1]}
+  # A "why" question gets longer to think (research/17); only slight jitter, as the pause works.
+  think: {uniform: [2.7, 3.3], clip: [2.5, 5.5]}
+  think_why: {uniform: [4.2, 4.8], clip: [2.5, 5.5]}
+
+# Each chunk's speed is the voice's base speed plus a uniform draw in ±jitter.
+speed_jitter: 0.025
+
+# Engine output is trimmed to where it rises above threshold, keeping pad seconds either side,
+# so the drawn gaps aren't stacked on the engine's own silence. Edges get a short fade.
+trim:
+  threshold: 0.01
+  pad: 0.02
+  fade: 0.008
+
+# Off in v1 (ticket 18 sign-off).
+breaths: false

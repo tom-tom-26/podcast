@@ -3,3 +3,7 @@
 voices:
   bm_george:
     engine: kokoro
+    # Base speed for long chunks; each chunk gets the pacing config's jitter on top. On the
+    # smoke Bundle 1.07 gives 178 wpm while speaking, as in the audition's long-chunk take, which
+    # ran 161 wpm overall. The smoke's own 139 wpm overall is mostly its pauses.
+    speed: 1.07
