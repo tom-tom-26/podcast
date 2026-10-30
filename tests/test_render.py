@@ -2,6 +2,7 @@ import re
 import wave
 
 import numpy as np
+import pytest
 import yaml
 
 from pipeline import render
@@ -57,7 +58,7 @@ def test_no_chunk_crosses_a_pause_paragraph_or_heading(smoke_bundle, tmp_path):
         assert not ("the blue come from?" in text and "In the next minute" in text)  # heading
 
 
-def test_writes_a_24_khz_mono_wav_with_the_think_pause(smoke_bundle, tmp_path):
+def test_writes_a_24_khz_mono_wav_with_no_pause_over_two_seconds(smoke_bundle, tmp_path):
     engine, wav = render_smoke(smoke_bundle, tmp_path)
 
     with wave.open(str(wav)) as audio:
@@ -65,7 +66,7 @@ def test_writes_a_24_khz_mono_wav_with_the_think_pause(smoke_bundle, tmp_path):
         samples = np.frombuffer(audio.readframes(audio.getnframes()), dtype=np.int16)
     speech_seconds = sum(len(text) for text, _ in engine.calls) / 100
     assert len(samples) / RATE > speech_seconds
-    assert longest_silence(samples) / RATE >= 2.5
+    assert longest_silence(samples) / RATE < 2
 
 
 def longest_silence(samples):
@@ -198,10 +199,6 @@ def think_pause_after(bundle, tmp_path, paragraph):
     return max(silences(read_samples(wav))) / RATE
 
 
-def test_a_why_question_gets_a_longer_think_pause(smoke_bundle, tmp_path):
-    assert think_pause_after(smoke_bundle, tmp_path, 'So why does ice float?"') >= 4.2
-
-
-def test_a_one_fact_question_after_an_earlier_why_gets_the_short_think(smoke_bundle, tmp_path):
-    paragraph = "Why do people guess wrong? Here is a simpler one. What colour is grass?"
-    assert think_pause_after(smoke_bundle, tmp_path, paragraph) <= 3.4
+@pytest.mark.parametrize("question", ["So why does ice float?", "What colour is grass?"])
+def test_a_think_pause_lasts_about_a_second(smoke_bundle, tmp_path, question):
+    assert 0.8 <= think_pause_after(smoke_bundle, tmp_path, question) <= 1.3

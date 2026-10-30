@@ -213,7 +213,7 @@ A Bundle is one folder per Episode, named by its Bundle id `<date>-<slug>`, whic
   - Pocket `charles` (stretch 0.905) and `alba` (0.907), both CC BY with a credit line; `stuart_bell` (no stretch), CC0.
   - Stretch floor about 0.85 (soft).
   - Re-calibrate `bm_george`'s base speed for long chunks.
-- **Pacing:** chunk cap about 300 characters (soft). Gap distributions at chunk, paragraph and Segment boundaries per research/18 5.4 (sentence about 0.38 s, paragraph about 0.75 s, Segment 1.3-1.7 s), plus `[beat]` and `[think]` lengths. Speed jitter ±0.025 per chunk. Trim on. Breaths off in v1.
+- **Pacing:** chunk cap about 300 characters (soft). Gap distributions at chunk, paragraph and Segment boundaries per research/18 5.4 (sentence about 0.38 s, paragraph about 0.75 s, Segment 1.3-1.7 s), plus `[beat]` and `[think]` lengths (`[think]` about 1 s, owner 2026-10-30, replacing research/18's 3-4.5 s). Speed jitter ±0.025 per chunk. Trim on. Breaths off in v1.
 - **Lexicon:** a `verified:` list of capitals words read right as written, and `entries:` of `{term, kokoro, pocket, by, note}`. `kokoro` is an espeak en-gb phoneme string in slashes or a lower-case respelling. `pocket` is optional (it defaults to the term as written). `note` holds the human version.
 - **De-slop rules:** the versioned phrase list. The core ten block; the rest warn.
 - **Show:** channel fields (title *Plainly Put*, author = show name, no owner email, `© 2026 Plainly Put`, `en-GB`, Education, not explicit, episodic, no seasons, link = archive page), the channel description text from ticket 12, block tags and the artwork path.

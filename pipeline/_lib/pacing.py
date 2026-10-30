@@ -12,7 +12,6 @@ from pipeline._lib.script import Pause, Segment
 PACING = Path("config") / "pacing.yaml"
 CLOSING_QUOTES = "\"'”’"
 SENTENCE_END = re.compile(rf"(?<=[.!?])\s+|(?<=[.!?][{CLOSING_QUOTES}])\s+")
-WHY = re.compile(r"\bwhy\b", re.IGNORECASE)
 
 
 def load_pacing(repo: Path) -> dict:
@@ -31,7 +30,7 @@ def pack(text: str, cap: int) -> list[str]:
 
 
 # When boundaries meet, as with a [think] closing a paragraph, the gap is the strongest one's.
-STRENGTH = ["chunk", "paragraph", "beat", "segment", "think", "think_why"]
+STRENGTH = ["chunk", "paragraph", "beat", "think", "segment"]
 
 
 def plan_chunks(segments: list[Segment], cap: int) -> list[dict]:
@@ -44,10 +43,7 @@ def plan_chunks(segments: list[Segment], cap: int) -> list[dict]:
             gap = _stronger(gap, "paragraph")
             for piece in paragraph:
                 if isinstance(piece, Pause):
-                    kind = piece.kind
-                    if kind == "think" and chunks and _asks_why(chunks[-1]["text"]):
-                        kind = "think_why"
-                    gap = _stronger(gap, kind)
+                    gap = _stronger(gap, piece.kind)
                     continue
                 for text in pack(piece, cap):
                     chunks.append({"segment": segment.title, "text": text, "gap": gap or "chunk"})
@@ -59,12 +55,6 @@ def plan_chunks(segments: list[Segment], cap: int) -> list[dict]:
 
 def _stronger(gap: str | None, kind: str) -> str:
     return kind if gap is None or STRENGTH.index(kind) > STRENGTH.index(gap) else gap
-
-
-def _asks_why(text: str) -> bool:
-    """Whether the question the chunk ends on is a why question, as in "So why...?"."""
-    questions = [s for s in SENTENCE_END.split(text) if s.rstrip(CLOSING_QUOTES).endswith("?")]
-    return bool(questions) and bool(WHY.search(questions[-1]))
 
 
 def draw_speed(rng: random.Random, voice_settings: dict, pacing: dict) -> float:
