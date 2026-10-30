@@ -78,7 +78,8 @@ jobs:
 
   report:
     needs: [deploy, smoke-check]
-    if: failure()
+    # A job cut off by its timeout ends cancelled, which failure() alone would miss.
+    if: failure() || cancelled()
     uses: ./.github/workflows/report-failure.yml
     permissions:
       actions: read

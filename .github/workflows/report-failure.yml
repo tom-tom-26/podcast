@@ -1,7 +1,8 @@
 name: report-failure
 
 # publish-episode and deploy-site call this when one of their jobs fails, so the owner hears
-# about it in one issue. Success calls nothing.
+# about it in one issue. Success calls nothing. ci is left out: a red check already shows on
+# its PR, and an issue for each one would be noise.
 on:
   workflow_call:
     inputs:

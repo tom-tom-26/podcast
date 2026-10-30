@@ -8,6 +8,8 @@ import sys
 from pipeline._lib.github import GitHub
 
 LABEL = "pipeline-failure"
+# A job or step cut off by its timeout concludes as cancelled, not failed.
+FAILED = ("failure", "cancelled")
 LOG_LINES = 30
 TIMESTAMP = re.compile(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ")
 
@@ -30,18 +32,17 @@ def main(args: argparse.Namespace, github=None) -> int:
         print("report: no run id; pass --run-id or set GITHUB_RUN_ID", file=sys.stderr)
         return 1
     github = github or GitHub.from_env()
-    failed = [job for job in github.run_jobs(args.run_id) if job["conclusion"] == "failure"]
-    if failed:
-        job = failed[0]
-        steps = [s for s in job["steps"] if s["conclusion"] in ("failure", "cancelled")]
-        stage = f"{job['name']} / {steps[0]['name']}" if steps else job["name"]
-        try:
-            lines = _last_lines(github.job_log(job["id"]))
-        except RuntimeError as error:
-            lines = f"The job log could not be fetched: {error}"
-    else:
-        stage = "unknown: no job in the run concluded with a failure"
-        lines = "No failed job to take log lines from."
+    failed = [job for job in github.run_jobs(args.run_id) if job["conclusion"] in FAILED]
+    if not failed:
+        print(f"report: run {args.run_id} has no failed job; no issue opened", file=sys.stderr)
+        return 0
+    job = failed[0]
+    steps = [step for step in job["steps"] if step["conclusion"] in FAILED]
+    stage = f"{job['name']} / {steps[0]['name']}" if steps else job["name"]
+    try:
+        log_tail = _log_tail(github.job_log(job["id"]))
+    except RuntimeError as error:
+        log_tail = f"The job log could not be fetched: {error}"
 
     bundle = args.bundle or "none"
     run_url = f"https://github.com/{github.repo}/actions/runs/{args.run_id}"
@@ -50,14 +51,14 @@ def main(args: argparse.Namespace, github=None) -> int:
         title += f" for {args.bundle}"
     body = (
         f"**Stage:** {stage}\n**Bundle:** {bundle}\n**Run:** {run_url}\n\n"
-        f"**Last log lines:**\n\n```text\n{lines}\n```\n"
+        f"**Last log lines:**\n\n```text\n{log_tail}\n```\n"
     )
     url = github.open_issue(title, body, [LABEL], [args.assignee])
     print(f"report: run {args.run_id} failed at {stage}; opened {url}", file=sys.stderr)
     return 0
 
 
-def _last_lines(log: str) -> str:
+def _log_tail(log: str) -> str:
     """The lines up to the job's last error, without timestamps, so the post-job cleanup
     that follows a failure doesn't push the cause out of view."""
     lines = [TIMESTAMP.sub("", line) for line in log.splitlines()]

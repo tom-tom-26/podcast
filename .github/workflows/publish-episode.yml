@@ -141,6 +141,7 @@ jobs:
           path: artifact/
           if-no-files-found: error
       # The deploy queues behind this run, since both share the publish concurrency group.
+      # Unlike a Release, a second deploy from a retry that had already landed does no harm.
       - name: Dispatch deploy-site
         if: ${{ !inputs.dry_run }}
         run: |
@@ -154,7 +155,8 @@ jobs:
 
   report:
     needs: publish
-    if: failure()
+    # A job cut off by its timeout ends cancelled, which failure() alone would miss.
+    if: failure() || cancelled()
     uses: ./.github/workflows/report-failure.yml
     permissions:
       actions: read

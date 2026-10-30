@@ -15,7 +15,7 @@ class FakeGitHub:
         self.calls = []
         self.audio = {}  # (tag, file name) -> bytes, for Releases a test puts in place
         self.upload_loses_bytes = upload_loses_bytes
-        self.jobs = []  # the workflow run's jobs, as a test sets them up
+        self.jobs = []
         self.logs = {}  # job id -> log text
         self.issues = []
 
@@ -74,7 +74,7 @@ class FakeGitHub:
     def job_log(self, job_id):
         self.calls.append("job_log")
         if job_id not in self.logs:
-            raise RuntimeError(f"GitHub GET job {job_id} logs failed: 404 Not Found")
+            raise RuntimeError(f"GET job {job_id} log failed: HTTP Error 404: Not Found")
         return self.logs[job_id]
 
     def open_issue(self, title, body, labels, assignees):

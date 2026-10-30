@@ -79,11 +79,22 @@ def test_only_the_last_lines_before_the_error_are_kept():
 def test_a_step_cut_off_by_its_timeout_is_named_as_the_stage():
     github = FakeGitHub()
     failed_publish_run(github)
+    github.jobs[0]["conclusion"] = "cancelled"
     github.jobs[0]["steps"][2]["conclusion"] = "cancelled"
 
     run_report(github, "--bundle", "2026-11-02-tides")
 
     assert "**Stage:** publish / Render" in github.issues[0]["body"]
+
+
+def test_a_run_with_no_failed_job_opens_no_issue():
+    github = FakeGitHub()
+    failed_publish_run(github)
+    github.jobs[0]["conclusion"] = "success"
+
+    assert run_report(github, "--bundle", "2026-11-02-tides") == 0
+
+    assert github.issues == []
 
 
 def test_a_log_that_cannot_be_fetched_still_opens_the_issue():
