@@ -50,6 +50,10 @@
 
 **Episode id**: The published name of an Episode, `ep-007-<slug>` (Parts `ep-004a-...`), given by the Pipeline at publish time in publish order. Used for the Release tag and file name.
 
+**Release**: The GitHub Release holding one Episode's audio for good, tagged with its Episode id. Audio lives here, never in git.
+
+**guid**: The Feed's permanent identifier for an Episode, made once at publish time. It never changes, even when the Episode is re-rendered, so podcast apps treat it as the same Episode.
+
 **Episode registry**: The committed list of published Episodes: number, Episode id, Bundle id, guid, voice, file size and duration. The Pipeline is the only writer.
 
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).

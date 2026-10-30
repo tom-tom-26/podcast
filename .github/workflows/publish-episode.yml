@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 45
     env:
       BUNDLE_ID: ${{ inputs.bundle }}
+      DRY_RUN: ${{ inputs.dry_run }}
       KOKORO_MODELS: ${{ github.workspace }}/models
     steps:
       - uses: actions/checkout@v7
@@ -35,8 +36,11 @@ jobs:
             echo "::error::Not a Bundle id: $BUNDLE_ID"
             exit 1
           fi
-          # The smoke Bundle is a test fixture, so it is not under bundles/.
-          for dir in "bundles/$BUNDLE_ID" "tests/fixtures/bundles/$BUNDLE_ID"; do
+          # The smoke Bundle is a test fixture, so it is not under bundles/. It may only
+          # dry-run: a real publish would spend an Episode number on it for good.
+          dirs=("bundles/$BUNDLE_ID")
+          if [ "$DRY_RUN" = "true" ]; then dirs+=("tests/fixtures/bundles/$BUNDLE_ID"); fi
+          for dir in "${dirs[@]}"; do
             if [ -d "$dir" ]; then
               echo "dir=$dir" >> "$GITHUB_OUTPUT"
               exit 0

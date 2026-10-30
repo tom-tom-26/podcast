@@ -18,7 +18,6 @@ class GitHub:
         self.repo = repo
         self.branch = branch
         self._token = token
-        self._release_ids: dict[str, int] = {}
 
     @classmethod
     def from_env(cls) -> "GitHub":
@@ -46,24 +45,34 @@ class GitHub:
             },
         )
 
-    def create_release(self, tag: str, title: str, notes: str) -> None:
+    def create_release(self, tag: str, title: str, notes: str) -> int:
+        """A draft Release, so nothing is public until its upload checks out."""
         release = self._request(
             "POST",
             f"{API}/repos/{self.repo}/releases",
-            {"tag_name": tag, "target_commitish": self.branch, "name": title, "body": notes},
+            {
+                "tag_name": tag,
+                "target_commitish": self.branch,
+                "name": title,
+                "body": notes,
+                "draft": True,
+            },
         )
-        self._release_ids[tag] = release["id"]
+        return release["id"]
 
-    def upload_asset(self, tag: str, file: Path) -> None:
+    def upload_asset(self, release_id: int, file: Path) -> None:
         query = urllib.parse.urlencode({"name": file.name})
-        url = f"{UPLOADS}/repos/{self.repo}/releases/{self._release_ids[tag]}/assets?{query}"
+        url = f"{UPLOADS}/repos/{self.repo}/releases/{release_id}/assets?{query}"
         content_type = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
         self._request("POST", url, file.read_bytes(), content_type)
 
-    def asset_sizes(self, tag: str) -> dict[str, int]:
-        """Each asset's byte size as GitHub reports it, by file name."""
-        release = self._request("GET", f"{API}/repos/{self.repo}/releases/tags/{tag}")
+    def asset_sizes(self, release_id: int) -> dict[str, int]:
+        # By id, because the by-tag lookup does not see drafts.
+        release = self._request("GET", f"{API}/repos/{self.repo}/releases/{release_id}")
         return {asset["name"]: asset["size"] for asset in release["assets"]}
+
+    def publish_release(self, release_id: int) -> None:
+        self._request("PATCH", f"{API}/repos/{self.repo}/releases/{release_id}", {"draft": False})
 
     def _request(self, method, url, body=None, content_type="application/json"):
         if body is not None and content_type == "application/json":

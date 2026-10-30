@@ -76,6 +76,7 @@ def test_first_publish_makes_episode_1_as_a_release_and_a_registry_entry(smoke_b
 
     m4a = tmp_path / "out" / "ep-001-smoke.m4a"
     release = github.releases["ep-001-smoke"]
+    assert not release["draft"]
     assert release["title"] == "Episode 1: Why the sky is blue"
     assert release["notes"].startswith("Why is the sky blue when sunlight is white?")
     assert "Encyclopaedia Britannica" in release["notes"]
@@ -94,6 +95,23 @@ def test_first_publish_makes_episode_1_as_a_release_and_a_registry_entry(smoke_b
     assert uuid.UUID(entry["guid"])
     assert 11 <= entry["duration"] <= 13
     assert [path for path, _ in github.commits] == ["episodes.yaml"]
+
+
+def test_the_upload_size_is_checked_before_the_release_goes_public_or_the_registry_changes(
+    smoke_bundle, tmp_path
+):
+    github = FakeGitHub()
+
+    publish_episode(smoke_bundle, tmp_path, github)
+
+    assert github.calls == [
+        "read_file",
+        "create_release",
+        "upload_asset",
+        "asset_sizes",
+        "publish_release",
+        "commit_file",
+    ]
 
 
 def test_numbers_count_up_in_publish_order_and_earlier_entries_never_change(smoke_bundle, tmp_path):
@@ -128,8 +146,19 @@ def test_a_byte_size_mismatch_fails_with_no_registry_commit(smoke_bundle, tmp_pa
     assert publish_episode(smoke_bundle, tmp_path, github) == 1
 
     assert "ep-001-smoke.m4a" in capsys.readouterr().err
+    assert github.releases["ep-001-smoke"]["draft"]
     assert github.commits == []
     assert registry(github) == []
+
+
+def test_a_folder_that_is_not_a_bundle_id_is_refused(smoke_bundle, tmp_path, capsys):
+    github = FakeGitHub()
+    renamed = smoke_bundle.rename(smoke_bundle.parent / "smoke")
+
+    assert publish_episode(renamed, tmp_path, github) == 1
+
+    assert "not a Bundle id" in capsys.readouterr().err
+    assert github.calls == []
 
 
 def publish_episode(bundle, tmp_path, github, *flags):

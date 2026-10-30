@@ -26,13 +26,18 @@ class FakeGitHub:
     def create_release(self, tag, title, notes):
         self.calls.append("create_release")
         assert tag not in self.releases, f"Release {tag} already exists"
-        self.releases[tag] = {"title": title, "notes": notes, "assets": {}}
+        self.releases[tag] = {"title": title, "notes": notes, "draft": True, "assets": {}}
+        return tag
 
-    def upload_asset(self, tag, file):
+    def upload_asset(self, release_id, file):
         self.calls.append("upload_asset")
         size = file.stat().st_size - self.upload_loses_bytes
-        self.releases[tag]["assets"][file.name] = size
+        self.releases[release_id]["assets"][file.name] = size
 
-    def asset_sizes(self, tag):
+    def asset_sizes(self, release_id):
         self.calls.append("asset_sizes")
-        return dict(self.releases[tag]["assets"])
+        return dict(self.releases[release_id]["assets"])
+
+    def publish_release(self, release_id):
+        self.calls.append("publish_release")
+        self.releases[release_id]["draft"] = False
