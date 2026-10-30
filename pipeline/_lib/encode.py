@@ -26,6 +26,17 @@ def encode_episode(wav: Path, m4a: Path) -> None:
     )  # fmt: skip
 
 
+def duration_seconds(audio: Path) -> int:
+    run = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+         str(audio)],
+        capture_output=True, text=True,
+    )  # fmt: skip
+    if run.returncode:
+        raise RuntimeError(f"ffprobe failed on {audio}: {run.stderr.strip()[-500:]}")
+    return round(float(run.stdout))
+
+
 def _measure(wav: Path) -> dict[str, str]:
     stderr = _ffmpeg("-i", str(wav), "-af", f"{LOUDNORM}:print_format=json", "-f", "null", "-")
     # loudnorm prints its measurements as the last JSON object on stderr.

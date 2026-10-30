@@ -11,8 +11,9 @@ on:
         type: boolean
         default: true
 
+# A real publish makes a Release and commits the Episode registry.
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: publish
@@ -26,11 +27,6 @@ jobs:
       BUNDLE_ID: ${{ inputs.bundle }}
       KOKORO_MODELS: ${{ github.workspace }}/models
     steps:
-      - name: Refuse a real publish
-        if: ${{ !inputs.dry_run }}
-        run: |
-          echo "::error::Publishing without dry_run is not built yet."
-          exit 1
       - uses: actions/checkout@v7
       - name: Find the Bundle
         id: bundle
@@ -78,8 +74,12 @@ jobs:
       - run: pipeline render "${{ steps.bundle.outputs.dir }}" --out "out/$BUNDLE_ID.wav"
       - run: >-
           pipeline publish "${{ steps.bundle.outputs.dir }}"
-          --wav "out/$BUNDLE_ID.wav" --dry-run --out-dir artifact
-      - uses: actions/upload-artifact@v7
+          --wav "out/$BUNDLE_ID.wav" --out-dir artifact
+          ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - if: ${{ inputs.dry_run }}
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.bundle }}
           path: artifact/*.m4a

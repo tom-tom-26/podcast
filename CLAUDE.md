@@ -44,7 +44,7 @@ When a session closes a build ticket (not an Episode run), end its report with:
 
 1. A short summary of what the ticket delivered, what was run to check it, and anything left for the owner.
 2. The build ticket table, built from live GitHub state (`gh issue list --state all --limit 100 --json number,title,state,body`), not from memory or `.scratch/`. One row per build ticket, in issue order, with these columns:
-   - `#`: the issue number.
+   - `#`: the issue number. The owner starts a session with "ticket N" from this column, so ticket N is always issue #N; the older numbering in `docs/wayfinder/tickets/` is not a ticket reference.
    - `Title`.
    - `Blocked by`: issue numbers from the "Blocked by" line, or `—`.
    - `Status`: `done` (closed), `ready` (open, every blocker closed), `blocked` (open, a blocker still open) or `owner` (labelled `ready-for-human`).
