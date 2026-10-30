@@ -6,6 +6,7 @@ A podcast made for one listener. The owner names a topic from their phone, a Cla
 
 - `pipeline/`: the Python package that lints scripts, renders audio, publishes Episodes and builds the site.
 - `docs/wayfinder/`: the planning history, including the spec (`spec.md`) and the research behind it.
+- `artwork/`: the Cover, drawn as an SVG. `python artwork/render.py` redraws `cover.png` after `pip install -e ".[artwork]"`.
 - `GLOSSARY.md`: what the words in this repo mean.
 
 ## Running it
