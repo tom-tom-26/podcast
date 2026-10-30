@@ -561,7 +561,7 @@ def test_a_malformed_correction_blocks(smoke_bundle, corrections):
     run = lint(smoke_bundle)
 
     assert run.returncode == 1
-    assert "corrections" in run.stdout
+    assert "meta.yaml: corrections" in run.stdout
 
 
 def test_a_minor_correction_with_its_show_notes_line_passes(smoke_bundle):
@@ -577,7 +577,8 @@ def test_a_minor_correction_with_its_show_notes_line_passes(smoke_bundle):
     run = lint(smoke_bundle)
 
     assert run.returncode == 0, run.stdout + run.stderr
-    assert "orrect" not in run.stdout
+    assert "corrections" not in run.stdout
+    assert "Corrected" not in run.stdout
 
 
 def test_a_correction_without_its_show_notes_line_only_warns(smoke_bundle):

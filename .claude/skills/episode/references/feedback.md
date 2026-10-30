@@ -18,11 +18,11 @@ Split the feedback into remarks, and send each one to the place where it changes
 | An avoidable mistake the Skill made (an outline that missed the point, a confusing analogy, a promise the Hook didn't keep) | a lesson in the Episode's field file or `learnings/general.md`, `source: owner` (`references/learnings.md`) | at once |
 | A word said wrong | a `config/lexicon.yaml` entry, `by: owner <date>` (`references/tts.md`), plus a Minor Correction | at once |
 | How a voice fit the Topic | that voice's `suits:` hints in `config/voices.yaml` | at once, Owner-instructed |
-| A phrase that grates or is overused | the `warn:` list in `config/deslop_rules.yaml`, with `version` raised by one | at once |
+| A phrase that grates or is overused | `config/deslop_rules.yaml`, with `version` raised by one: `block:` when the owner bans it outright ("never say X"), `warn:` otherwise | at once |
 | A wrong fact, or a claim stated more strongly than its evidence | a Correction (below) | after the confirm, for Harmful and Material |
 | Anything you can't place | one Listener profile observation | at once |
 
-A lexicon entry from the owner needs both engines' readings worked out as `references/tts.md` says. The owner's spelling ("KOH-koh-roh") goes in `note`. Never take a phrase off the phrase list and never touch `block:`: auto-merge refuses a phrase list that loses a line.
+A lexicon entry from the owner needs both engines' readings worked out as `references/tts.md` says. The owner's spelling ("KOH-koh-roh") goes in `note`. Never take a phrase off the phrase list or reword one: auto-merge refuses a phrase list that loses a line.
 
 ### Instructions and reactions
 
@@ -52,7 +52,7 @@ Propose a grade; the owner may move it in their reply.
 1. Find what the Episode said: the Script sentences and the ledger line their Claim tags point to.
 2. Check it as `references/accuracy.md` says, numbers from raw text. If the Episode was right, say so with the source and change nothing.
 3. **Episode family.** Read `episodes.yaml` and each listed Bundle's `meta.yaml`. The family is the Episode, its sibling Parts (the same `part.series_slug`) and every Q&A whose `parent_episode` is any of them, and Q&As on those. Grep each one's `ledger.md` and `script.md` for the same claim. Every hit goes into the same confirm, each with its own grade.
-4. **The Window.** Episodes outside the Pages Window aren't in the Feed. Start with the newest Episode and every Episode in `pinned.txt`, adding up their `bytes` from `episodes.yaml`. Then add the others newest first until the sum reaches `budget_mb` in `config/site.yaml` (in megabytes of 1,000,000 bytes). The one that crosses the line is still in. A topic's Parts (4a, 4b) always go in or out together, and a pin on one keeps them all. Anything not added is outside.
+4. **The Window.** Episodes outside the Pages Window have no copy on Pages, and leave the Feed unless `repoint` is on in `config/site.yaml`; the Archive page and their Release keep them either way. Start with the newest Episode and every Episode in `pinned.txt`, adding up their `bytes` from `episodes.yaml`. Then add the others newest first until the sum reaches `budget_mb` in `config/site.yaml` (in megabytes of 1,000,000 bytes). The one that crosses the line is still in. A topic's Parts (4a, 4b) always go in or out together, and a pin on one keeps them all. Anything not added is outside.
 
 ### Confirm
 

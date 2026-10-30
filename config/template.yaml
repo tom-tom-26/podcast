@@ -2,8 +2,7 @@
 # in Feedback mode. Every number is soft, about ±25%. The prose rules around them live in
 # .claude/skills/episode/references/template.md.
 #
-# Raise style_guide_version by one whenever a number here changes, in the same commit, which
-# must be marked Owner-instructed and quote the owner, or auto-merge leaves it for the owner.
+# Raise style_guide_version by one whenever a number here changes.
 style_guide_version: 1
 
 # Spoken words a minute the Script is written to; re-calibrated to the voice after two Episodes.

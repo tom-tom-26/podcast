@@ -255,13 +255,12 @@ def style_warnings(
     return warnings
 
 
-def pace_warnings(segments: list[Segment], meta: dict, tunables: dict) -> list[str]:
-    """Spoken words at the wpm budget, against the Variant's ceiling in the Template
-    tunables. There is no minimum."""
+def pace_warnings(segments: list[Segment], meta: dict, ceiling: float) -> list[str]:
+    """Spoken words at the wpm budget, against the Variant's ceiling in minutes. There is no
+    minimum."""
     words = sum(
         len(paragraph.split()) for segment in segments for paragraph in spoken_paragraphs(segment)
     )
-    ceiling = tunables["variants"][meta["variant"]]["max_minutes"]
     budget = meta.get("wpm_budget")
     if not isinstance(budget, int) or budget <= 0:
         return [f"meta.yaml: wpm_budget {budget!r} is not a positive number, so pace is unchecked"]
@@ -277,7 +276,7 @@ def pace_warnings(segments: list[Segment], meta: dict, tunables: dict) -> list[s
 # The correction lines (ticket 16) are worded the same in every corrected Episode by design.
 CORRECTION_NOTE = re.compile(r"^Corrected \d{4}-\d{2}-\d{2}:.*$", re.M)
 SPOKEN_CORRECTION = re.compile(r"This version corrects what an earlier one said about [^.]*\.")
-# "Near the start" (ticket 16): before the first content Segment.
+# "Near the start" (ticket 16): the Hook or the Roadmap, before any content Segment.
 OPENING_SEGMENTS = 2
 
 
@@ -285,11 +284,14 @@ def correction_warnings(segments: list[Segment] | None, meta: dict, notes: str) 
     """Each Correction in meta.yaml without its dated show-notes line, and a Harmful one
     without the spoken line near the start."""
     corrections = meta.get("corrections") or []
+    dated = {
+        line.split(":")[0].removeprefix("Corrected ") for line in CORRECTION_NOTE.findall(notes)
+    }
     warnings = [
         f"show_notes.md: no 'Corrected {c['date']}:' line for the {c['tier']} Correction "
         f"to {c['claim']!r}"
         for c in corrections
-        if not re.search(rf"^Corrected {c['date']}:", notes, re.M)
+        if str(c["date"]) not in dated
     ]
     opening = " ".join(
         paragraph
@@ -298,8 +300,8 @@ def correction_warnings(segments: list[Segment] | None, meta: dict, notes: str) 
     )
     if any(c["tier"] == "Harmful" for c in corrections) and not SPOKEN_CORRECTION.search(opening):
         warnings.append(
-            "script.md, Hook: a Harmful Correction needs the spoken correction line near the "
-            "start ('This version corrects what an earlier one said about ...')"
+            "script.md, Hook: a Harmful Correction needs the spoken correction line in the "
+            "Hook or Roadmap ('This version corrects what an earlier one said about ...')"
         )
     return warnings
 
