@@ -61,7 +61,8 @@ jobs:
             # A re-render names the Episode, and the Episode registry names its Bundle.
             if [ "$RERENDER" = "true" ]; then
               episode="$id"
-              id=$(episode="$episode" yq                 '.episodes[] | select(.episode_id == strenv(episode)) | .bundle_id' episodes.yaml)
+              id=$(episode="$episode" yq \
+                '.episodes[] | select(.episode_id == strenv(episode)) | .bundle_id' episodes.yaml)
               if [ -z "$id" ]; then
                 echo "::error::$episode is not in the Episode registry, so it can't re-render"
                 exit 1

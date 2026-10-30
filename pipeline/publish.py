@@ -219,13 +219,8 @@ def _rerender(args, github, gate, episodes, sha, out_dirs, started) -> int:
     if not _uploads_match(github, releases, ids, m4as, reports):
         return 1
 
-    roster = load_roster(args.repo)
-    for bundle, entry, release, m4a in zip(args.bundle, found, releases, m4as, strict=True):
-        meta = load_meta(bundle)
-        notes = with_credit(
-            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, meta["voice"]
-        )
-        github.update_release(release, f"Episode {entry['number']}: {meta['title']}", notes)
+    metas = [load_meta(bundle) for bundle in args.bundle]
+    for entry, meta, m4a in zip(found, metas, m4as, strict=True):
         entry.update(
             voice=meta["voice"],
             file=m4a.name,
@@ -234,9 +229,17 @@ def _rerender(args, github, gate, episodes, sha, out_dirs, started) -> int:
         )
     done = ", ".join(f"{e} as v{v}" for e, v in zip(ids, versions, strict=True))
     github.commit_file(REGISTRY, dump_registry(episodes), sha, f"Re-render {done}")
+    # Only once the registry has moved, so a failed commit never leaves a Release saying it
+    # was corrected while the Feed still serves the old file.
+    roster = load_roster(args.repo)
+    for bundle, entry, meta, release in zip(args.bundle, found, metas, releases, strict=True):
+        notes = with_credit(
+            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, meta["voice"]
+        )
+        github.update_release(release, f"Episode {entry['number']}: {meta['title']}", notes)
     print(
-        f"publish: re-rendered {done}, guids kept, registry committed, "
-        f"{time.perf_counter() - started:.1f} s in all",
+        f"publish {' '.join(ids)}: re-rendered {done}, guids kept, registry committed and "
+        f"Release text updated, {time.perf_counter() - started:.1f} s in all",
         file=sys.stderr,
     )
     return 0

@@ -96,6 +96,8 @@
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).
 
+**Revision**: A Bundle's version number in `meta.yaml`, 1 when the Skill writes it. A Correction that needs a Re-render raises it by one; it never goes down.
+
 **Re-render**: Publishing a published Episode again from its corrected Bundle, as `-v2.m4a` (then `-v3`) in the same Release. The old file stays, the guid and Episode number never change, and the Episode registry entry moves to the new file. Auto-merge starts one when a published Bundle's `revision` rises.
 
 **Topic backlog**: The owner's list of topics for later Episodes (`config/backlog.md`). Only the owner adds to it, by hand or through the Skill; summoning with "next" takes the top line. The Skill never suggests topics on its own.

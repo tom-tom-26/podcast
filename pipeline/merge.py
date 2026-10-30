@@ -169,7 +169,7 @@ def _publish_groups(bundle_ids: list[str], repo: Path) -> list[str]:
     return [" ".join(bundle_id for _, bundle_id in sorted(group)) for group in groups.values()]
 
 
-def _compared(before, after) -> bool:
+def _comparable(before, after) -> bool:
     # A revision lint would refuse anyway is never compared, so it can't crash the decision.
     return all(isinstance(r, int) and not isinstance(r, bool) for r in (before, after))
 
@@ -211,7 +211,7 @@ def decide(
     decision.lint = sorted(bundles)
     for bundle_id in decision.lint:
         before, after = revisions.get(bundle_id, (None, None))
-        if bundle_id not in published or not _compared(before, after):
+        if bundle_id not in published or not _comparable(before, after):
             continue
         if after > before:
             decision.rerender.append(published[bundle_id])
