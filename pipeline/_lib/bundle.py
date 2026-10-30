@@ -58,6 +58,7 @@ def _meta_problems(path: Path) -> list[str]:
     ]
     problems += [f"pronunciations: {p}" for p in entry_problems(meta.get("pronunciations"))]
     problems += _part_problems(meta)
+    problems += _question_problems(meta)
     revision = meta.get("revision")
     if not _whole_number(revision):
         problems.append("revision must be a whole number from 1")
@@ -80,6 +81,22 @@ def _part_problems(meta: dict) -> list[str]:
         return ["part must be null or {n, of, series_slug} with n from 1 to of, and of 2 or 3"]
     if meta.get("parent_episode"):
         return ["parent_episode: a Q&A stands alone, so it is never a Part"]
+    return []
+
+
+def _question_problems(meta: dict) -> list[str]:
+    questions = meta.get("questions")
+    if not meta.get("parent_episode"):
+        if questions:
+            return ["questions: only a Q&A has them, and parent_episode is not set"]
+        return []
+    # The show notes quote these word for word (ticket 11), so each must be real text.
+    if (
+        not isinstance(questions, list)
+        or not questions
+        or not all(isinstance(q, str) and q.strip() for q in questions)
+    ):
+        return ["questions: a Q&A needs the owner's questions, word for word, as a list of text"]
     return []
 
 

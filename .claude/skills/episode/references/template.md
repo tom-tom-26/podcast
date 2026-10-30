@@ -137,8 +137,8 @@ target_words: 4100                      # what you aimed for
 spoken_words: 3980                      # what the Script has, markup excluded
 style_guide_version: 1
 deslop_version: 1                       # the version in config/deslop_rules.yaml
-parent_episode: null
-questions: []
+parent_episode: null                    # a Q&A: the parent's episode_id (qa.md)
+questions: []                           # a Q&A: the owner's questions, word for word
 revision: 1
 corrections: []
 ```

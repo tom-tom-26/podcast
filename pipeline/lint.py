@@ -90,7 +90,12 @@ def main(args: argparse.Namespace) -> int:
         except ScriptError:
             segments = None  # already reported by bundle_problems
         if segments:
-            warnings += style_warnings(segments, meta and meta["variant"], lexicon)
+            warnings += style_warnings(
+                segments,
+                meta and meta["variant"],
+                lexicon,
+                meta and meta.get("parent_episode") and meta.get("questions"),
+            )
             if meta:
                 warnings += pace_warnings(segments, meta)
     if meta:

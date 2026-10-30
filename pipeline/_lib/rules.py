@@ -179,11 +179,33 @@ HETERONYMS = re.compile(
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
-def style_warnings(segments: list[Segment], variant: str | None, lexicon: Lexicon) -> list[str]:
-    """research/05 section 8's mechanical soft items, as warnings."""
+def style_warnings(
+    segments: list[Segment], variant: str | None, lexicon: Lexicon, questions: list | None
+) -> list[str]:
+    """research/05 section 8's mechanical soft items, as warnings. `questions` is set for a
+    Q&A, which has its own shape (ticket 11): no Roadmap, a Segment per question and one
+    Recall prompt for the whole Episode."""
     warnings = []
     titles = [segment.title for segment in segments]
-    if titles[:2] != ["Hook", "Roadmap"] or titles[-2:] != ["Recap", "Sign-off"]:
+    if questions:
+        if titles[:1] != ["Hook"] or titles[-2:] != ["Recap", "Sign-off"]:
+            warnings.append(
+                "script.md: a Q&A's Segments should run Hook first and end with Recap and Sign-off"
+            )
+        answers = sum(bool(CONTENT_SEGMENT.match(title)) for title in titles)
+        if answers != len(questions):
+            warnings.append(
+                f"script.md: {answers} content Segments for {len(questions)} question"
+                f"{'' if len(questions) == 1 else 's'} in meta.yaml (aim for one each)"
+            )
+        if not any(
+            isinstance(piece, Pause) and piece.kind == "think"
+            for segment in segments
+            for paragraph in segment.paragraphs
+            for piece in paragraph
+        ):
+            warnings.append("script.md: a Q&A has no [think] for its Recall prompt")
+    elif titles[:2] != ["Hook", "Roadmap"] or titles[-2:] != ["Recap", "Sign-off"]:
         warnings.append(
             "script.md: Segments should run Hook first, then Roadmap, and end with Recap "
             "and Sign-off"
@@ -214,10 +236,14 @@ def style_warnings(segments: list[Segment], variant: str | None, lexicon: Lexico
                 for s in sentences
                 if len(s.split()) > SENTENCE_WORDS
             ]
-        if CONTENT_SEGMENT.match(segment.title) and not any(
-            isinstance(piece, Pause) and piece.kind == "think"
-            for paragraph in segment.paragraphs
-            for piece in paragraph
+        if (
+            not questions
+            and CONTENT_SEGMENT.match(segment.title)
+            and not any(
+                isinstance(piece, Pause) and piece.kind == "think"
+                for paragraph in segment.paragraphs
+                for piece in paragraph
+            )
         ):
             warnings.append(f"{where}: content Segment has no [think] for its Recall prompt")
         text = " ".join(spoken)
