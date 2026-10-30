@@ -162,6 +162,45 @@ def test_claim_tag_without_a_ledger_line_blocks(smoke_bundle):
     assert "c9" in run.stdout
 
 
+SKY_CLAIM = "c1 | A clear daytime sky looks blue to people. |"
+
+
+@pytest.mark.parametrize(
+    ("line", "message"),
+    [
+        (
+            "c1 | A clear daytime sky looks blue to people. | NASA Space Place | 3 | full text",
+            "5 fields, not 7",
+        ),
+        (
+            "c1 | A clear daytime sky looks blue to people. | NASA Space Place | 3 | summary | - "
+            "| consensus",
+            "read depth",
+        ),
+        (
+            "c1 | A clear daytime sky looks blue to people. | NASA Space Place | strong | full "
+            "text | - | consensus",
+            "tier",
+        ),
+    ],
+)
+def test_malformed_ledger_line_only_warns(smoke_bundle, line, message):
+    ledger = smoke_bundle / "ledger.md"
+    lines = ledger.read_text(encoding="utf-8").splitlines()
+    assert lines[0].startswith(SKY_CLAIM)
+    ledger.write_text("\n".join([line, *lines[1:]]) + "\n", encoding="utf-8")
+
+    run = lint(smoke_bundle)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "warning" in run.stdout
+    assert f"ledger.md, c1: {message}" in run.stdout
+
+
+def test_smoke_ledger_has_no_ledger_warning(smoke_bundle):
+    assert "ledger.md" not in lint(smoke_bundle).stdout
+
+
 def test_content_segment_without_a_claim_tag_blocks(smoke_bundle):
     script = smoke_bundle / "script.md"
     text = script.read_text(encoding="utf-8")
