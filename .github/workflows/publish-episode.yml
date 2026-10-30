@@ -4,12 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       bundle:
-        description: "Bundle id, such as 2026-10-30-smoke, or the Parts' Bundle ids with spaces"
+        description: >-
+          Bundle id, such as 2026-10-30-smoke, or the Parts' Bundle ids with spaces; for a
+          re-render, Episode ids such as ep-007-tides
         required: true
       dry_run:
         description: "Only encode, and keep the .m4a as a workflow artifact"
         type: boolean
         default: true
+      rerender:
+        description: "Re-render published Episodes as -v2 (then -v3) under the same guid"
+        type: boolean
+        default: false
       voice:
         description: "Dry run only: a roster voice to read the Bundle in instead of its own"
         required: false
@@ -32,6 +38,7 @@ jobs:
       BUNDLE_ID: ${{ inputs.bundle }}
       DRY_RUN: ${{ inputs.dry_run }}
       VOICE: ${{ inputs.voice }}
+      RERENDER: ${{ inputs.rerender }}
       KOKORO_MODELS: ${{ github.workspace }}/models
       # Its own folder, so its cache never overlaps the Kokoro or Pocket ones.
       WHISPER_MODELS: ${{ github.workspace }}/whisper
@@ -51,6 +58,16 @@ jobs:
           # Parts come as several ids, and publish together or not at all.
           found=()
           for id in $BUNDLE_ID; do
+            # A re-render names the Episode, and the Episode registry names its Bundle.
+            if [ "$RERENDER" = "true" ]; then
+              episode="$id"
+              id=$(episode="$episode" yq \
+                '.episodes[] | select(.episode_id == strenv(episode)) | .bundle_id' episodes.yaml)
+              if [ -z "$id" ]; then
+                echo "::error::$episode is not in the Episode registry, so it can't re-render"
+                exit 1
+              fi
+            fi
             if [[ ! "$id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
               echo "::error::Not a Bundle id: $id"
               exit 1
@@ -150,10 +167,11 @@ jobs:
         run: |
           wavs=()
           for dir in $DIRS; do wavs+=("out/$(basename "$dir").wav"); done
-          pipeline publish $DIRS --wav "${wavs[@]}" --out-dir artifact $DRY_RUN_FLAG
+          pipeline publish $DIRS --wav "${wavs[@]}" --out-dir artifact $DRY_RUN_FLAG $RERENDER_FLAG
         env:
           DIRS: ${{ steps.bundle.outputs.dirs }}
           DRY_RUN_FLAG: ${{ inputs.dry_run && '--dry-run' || '' }}
+          RERENDER_FLAG: ${{ inputs.rerender && '--rerender' || '' }}
           GITHUB_TOKEN: ${{ github.token }}
       - if: ${{ inputs.dry_run }}
         uses: actions/upload-artifact@v7

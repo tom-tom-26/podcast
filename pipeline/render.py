@@ -5,6 +5,7 @@ import random
 import sys
 import time
 import wave
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
@@ -75,9 +76,14 @@ def render_bundle(
     plan = plan_chunks(
         parse_script((bundle / "script.md").read_text(encoding="utf-8")), pacing["chunk_cap"]
     )
-    # Every draw is made before any audio, so a chunk's draws never depend on another's audio.
-    rng = random.Random(bundle.name)
+    # Each chunk's draws are seeded by the Bundle id and its own text, not drawn in turn from
+    # one stream, so a Correction that adds or drops a chunk leaves every other chunk's speed,
+    # seed and gap as they were and the unchanged passages sound the same. A text said twice
+    # counts its repeats, so the two takes still differ.
+    said: Counter[str] = Counter()
     for chunk in plan:
+        said[chunk["text"]] += 1
+        rng = random.Random(f"{bundle.name}:{said[chunk['text']]}:{chunk['text']}")
         chunk["gap_seconds"] = draw_gap(rng, pacing["gaps"][chunk["gap"]]) if chunk["gap"] else 0
         _draw_voice(rng, chunk, settings, pacing)
     _warn_below_floor(bundle, settings, roster.get("stretch_floor", 0))

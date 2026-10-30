@@ -75,6 +75,14 @@ class GitHub:
         release = self._request("GET", f"{API}/repos/{self.repo}/releases/{release_id}")
         return {asset["name"]: asset["size"] for asset in release["assets"]}
 
+    def release_id(self, tag: str) -> int:
+        release = self._request("GET", f"{API}/repos/{self.repo}/releases/tags/{tag}")
+        return release["id"]
+
+    def update_release(self, release_id: int, title: str, notes: str) -> None:
+        url = f"{API}/repos/{self.repo}/releases/{release_id}"
+        self._request("PATCH", url, {"name": title, "body": notes})
+
     def publish_release(self, release_id: int) -> None:
         self._request("PATCH", f"{API}/repos/{self.repo}/releases/{release_id}", {"draft": False})
 

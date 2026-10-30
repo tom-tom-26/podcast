@@ -2,6 +2,7 @@
 
 import argparse
 import functools
+import re
 import sys
 import time
 import uuid
@@ -41,6 +42,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--dry-run",
         action="store_true",
         help="only encode and gate the .m4a: no Release, registry change or deploy",
+    )
+    parser.add_argument(
+        "--rerender",
+        action="store_true",
+        help="re-render published Episodes as -v2 (then -v3) in their own Releases, same guid",
     )
     parser.add_argument(
         "--repo",
@@ -99,6 +105,8 @@ def main(
     github = github or GitHub.from_env()
     text, sha = github.read_file(REGISTRY)
     episodes = load_registry(text)
+    if args.rerender:
+        return _rerender(args, github, gate, episodes, sha, out_dirs, started)
     for episode in episodes:
         if episode["bundle_id"] in bundle_ids:
             print(
@@ -137,17 +145,8 @@ def main(
         github.upload_asset(release, m4a)
         github.upload_asset(release, report)
         releases.append(release)
-    for release, episode, m4a, report in zip(releases, ids, m4as, reports, strict=True):
-        uploaded = github.asset_sizes(release)
-        for asset in (m4a, report):
-            if uploaded.get(asset.name) != asset.stat().st_size:
-                print(
-                    f"publish {episode}: draft Release has {asset.name} at "
-                    f"{uploaded.get(asset.name)} bytes but the local file is "
-                    f"{asset.stat().st_size}; nothing published and the registry is unchanged",
-                    file=sys.stderr,
-                )
-                return 1
+    if not _uploads_match(github, releases, ids, m4as, reports):
+        return 1
     for release in releases:
         github.publish_release(release)
     print(f"publish {' '.join(ids)}: Releases published, upload sizes checked", file=sys.stderr)
@@ -174,6 +173,102 @@ def main(
         file=sys.stderr,
     )
     return 0
+
+
+def _rerender(args, github, gate, episodes, sha, out_dirs, started) -> int:
+    """Re-render published Episodes into their own Releases as the next free -vN file, keeping
+    every earlier file and the guid, then move each registry entry to the new file in one
+    commit. Every Episode is gated and its upload checked before the registry changes."""
+    entries = {episode["bundle_id"]: episode for episode in episodes}
+    for bundle in args.bundle:
+        if bundle.name not in entries:
+            print(
+                f"publish {bundle.name}: {bundle.name} is not published, so there is nothing to "
+                "re-render",
+                file=sys.stderr,
+            )
+            return 1
+    found = [entries[bundle.name] for bundle in args.bundle]
+    ids = [entry["episode_id"] for entry in found]
+    releases = [github.release_id(episode) for episode in ids]
+    # The next number free in the Release, not the registry's, since a re-render that failed
+    # its upload check leaves its file behind and GitHub refuses a second asset of that name.
+    versions = [
+        _next_version(episode, github.asset_sizes(release))
+        for episode, release in zip(ids, releases, strict=True)
+    ]
+    m4as = [
+        out / f"{episode}-v{version}.m4a"
+        for out, episode, version in zip(out_dirs, ids, versions, strict=True)
+    ]
+    reports = [
+        gate(bundle, wav, m4a, episode)
+        for bundle, wav, m4a, episode in zip(args.bundle, args.wav, m4as, ids, strict=True)
+    ]
+    if not all(reports):
+        if len(ids) > 1:
+            print(f"publish {' '.join(ids)}: one failed, so none is re-rendered", file=sys.stderr)
+        return 1
+    reports = [
+        report.replace(report.with_name(f"{report.stem}-v{version}{report.suffix}"))
+        for report, version in zip(reports, versions, strict=True)
+    ]
+    for release, m4a, report in zip(releases, m4as, reports, strict=True):
+        github.upload_asset(release, m4a)
+        github.upload_asset(release, report)
+    if not _uploads_match(github, releases, ids, m4as, reports):
+        return 1
+
+    metas = [load_meta(bundle) for bundle in args.bundle]
+    for entry, meta, m4a in zip(found, metas, m4as, strict=True):
+        entry.update(
+            voice=meta["voice"],
+            file=m4a.name,
+            bytes=m4a.stat().st_size,
+            duration=duration_seconds(m4a),
+        )
+    done = ", ".join(f"{e} as v{v}" for e, v in zip(ids, versions, strict=True))
+    github.commit_file(REGISTRY, dump_registry(episodes), sha, f"Re-render {done}")
+    # Only once the registry has moved, so a failed commit never leaves a Release saying it
+    # was corrected while the Feed still serves the old file.
+    roster = load_roster(args.repo)
+    for bundle, entry, meta, release in zip(args.bundle, found, metas, releases, strict=True):
+        notes = with_credit(
+            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, meta["voice"]
+        )
+        github.update_release(release, f"Episode {entry['number']}: {meta['title']}", notes)
+    print(
+        f"publish {' '.join(ids)}: re-rendered {done}, guids kept, registry committed and "
+        f"Release text updated, {time.perf_counter() - started:.1f} s in all",
+        file=sys.stderr,
+    )
+    return 0
+
+
+def _next_version(episode: str, assets: dict[str, int]) -> int:
+    # The first render is v1 with no suffix.
+    taken = [
+        int(found[1] or 1)
+        for name in assets
+        if (found := re.fullmatch(rf"{re.escape(episode)}(?:-v(\d+))?\.m4a", name))
+    ]
+    return max(taken, default=1) + 1
+
+
+def _uploads_match(github, releases, ids, m4as, reports) -> bool:
+    """Whether every uploaded file has the local file's byte size, said per file if not."""
+    for release, episode, m4a, report in zip(releases, ids, m4as, reports, strict=True):
+        uploaded = github.asset_sizes(release)
+        for asset in (m4a, report):
+            if uploaded.get(asset.name) != asset.stat().st_size:
+                print(
+                    f"publish {episode}: Release has {asset.name} at "
+                    f"{uploaded.get(asset.name)} bytes but the local file is "
+                    f"{asset.stat().st_size}; the registry is unchanged",
+                    file=sys.stderr,
+                )
+                return False
+    return True
 
 
 def _encode_and_gate(
