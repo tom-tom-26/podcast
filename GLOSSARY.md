@@ -78,6 +78,8 @@
 
 **Gate**: One of publish's firm checks on the encoded Episode, decoded again: the ASR round trip, silence, loudness, true peak and format (research/15). A fail stops the run before the Release; an ASR fail first re-renders the chunk it names, once.
 
+**Failure issue**: The one GitHub issue a failed publish-episode or deploy-site run opens, labelled `pipeline-failure` and assigned to the owner: the stage that failed, the Bundle and the last log lines. A run that succeeds opens nothing.
+
 **ASR report**: `asr_report.yaml`, a Release asset beside the audio, recording for each capitals word and Lexicon term in the Script whether the ASR round trip heard it as written. Weak evidence the Skill weighs before proposing a `verified:` addition.
 
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).

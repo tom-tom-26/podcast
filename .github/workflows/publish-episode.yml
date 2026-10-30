@@ -35,6 +35,8 @@ jobs:
       KOKORO_MODELS: ${{ github.workspace }}/models
       # Its own folder, so its cache never overlaps the Kokoro or Pocket ones.
       WHISPER_MODELS: ${{ github.workspace }}/whisper
+      # Network steps retry at most twice; pip's own default is five.
+      PIP_RETRIES: "2"
     steps:
       - uses: actions/checkout@v7
       - name: Find the Bundle
@@ -67,7 +69,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install ffmpeg
-        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+        run: >-
+          command -v ffmpeg || (sudo apt-get -o Acquire::Retries=2 update
+          && sudo apt-get -o Acquire::Retries=2 install -y ffmpeg)
       # Only the engine the voice needs: Pocket brings PyTorch, which a Kokoro run never wants.
       - run: pip install -e ".[asr]"
       - name: Restore the ASR model
@@ -117,11 +121,14 @@ jobs:
           6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb  models/kokoro-v1.0.int8.onnx
           bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d  models/voices-v1.0.bin
           SUMS
-      - run: pipeline lint "${{ steps.bundle.outputs.dir }}"
-      - run: >-
+      - name: Lint
+        run: pipeline lint "${{ steps.bundle.outputs.dir }}"
+      - name: Render
+        run: >-
           pipeline render "${{ steps.bundle.outputs.dir }}" --out "out/$BUNDLE_ID.wav"
           ${VOICE:+--voice "$VOICE"}
-      - run: >-
+      - name: Publish
+        run: >-
           pipeline publish "${{ steps.bundle.outputs.dir }}"
           --wav "out/$BUNDLE_ID.wav" --out-dir artifact
           ${{ inputs.dry_run && '--dry-run' || '' }}
@@ -134,7 +141,26 @@ jobs:
           path: artifact/
           if-no-files-found: error
       # The deploy queues behind this run, since both share the publish concurrency group.
-      - if: ${{ !inputs.dry_run }}
-        run: gh workflow run deploy-site.yml --ref "$GITHUB_REF_NAME"
+      # Unlike a Release, a second deploy from a retry that had already landed does no harm.
+      - name: Dispatch deploy-site
+        if: ${{ !inputs.dry_run }}
+        run: |
+          for attempt in 1 2 3; do
+            gh workflow run deploy-site.yml --ref "$GITHUB_REF_NAME" -f bundle="$BUNDLE_ID" && exit 0
+            [ "$attempt" = 3 ] || sleep 5
+          done
+          exit 1
         env:
           GH_TOKEN: ${{ github.token }}
+
+  report:
+    needs: publish
+    # A job cut off by its timeout ends cancelled, which failure() alone would miss.
+    if: failure() || cancelled()
+    uses: ./.github/workflows/report-failure.yml
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    with:
+      bundle: ${{ inputs.bundle }}

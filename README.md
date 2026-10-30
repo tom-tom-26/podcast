@@ -30,3 +30,5 @@ pipeline publish tests/fixtures/bundles/2026-10-30-smoke --wav out/smoke.wav --d
 Before anything goes up, `publish` checks the encoded audio: a speech-recognition round trip against the Script, the longest silence, loudness, true peak and format. It needs the ASR extra, `pip install -e ".[asr]"`.
 
 On GitHub, run the publish-episode workflow with a Bundle id: with `dry_run` you get the `.m4a` and its ASR report as a workflow artifact; without it the Episode goes up as a Release, is added to `episodes.yaml` (the Episode registry), and the deploy-site workflow rebuilds the Pages site from the registry, `config/show.yaml` and the Releases. Run deploy-site by hand to redeploy. If any audio can't be fetched or a check fails, nothing is deployed and the last good site stays up.
+
+A failed run of either workflow opens one issue labelled `pipeline-failure`, naming the stage, the Bundle and the last log lines. A run that succeeds says nothing.

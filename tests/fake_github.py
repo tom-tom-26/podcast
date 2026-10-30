@@ -15,6 +15,9 @@ class FakeGitHub:
         self.calls = []
         self.audio = {}  # (tag, file name) -> bytes, for Releases a test puts in place
         self.upload_loses_bytes = upload_loses_bytes
+        self.jobs = []
+        self.logs = {}  # job id -> log text
+        self.issues = []
 
     def read_file(self, path):
         self.calls.append("read_file")
@@ -63,3 +66,18 @@ class FakeGitHub:
         if (tag, name) not in self.audio:
             raise RuntimeError(f"GET {self.download_url(tag, name)} failed: 404 Not Found")
         dest.write_bytes(self.audio[tag, name])
+
+    def run_jobs(self, run_id):
+        self.calls.append("run_jobs")
+        return self.jobs
+
+    def job_log(self, job_id):
+        self.calls.append("job_log")
+        if job_id not in self.logs:
+            raise RuntimeError(f"GET job {job_id} log failed: HTTP Error 404: Not Found")
+        return self.logs[job_id]
+
+    def open_issue(self, title, body, labels, assignees):
+        self.calls.append("open_issue")
+        self.issues.append({"title": title, "body": body, "labels": labels, "assignees": assignees})
+        return f"https://github.com/{self.repo}/issues/{len(self.issues)}"
