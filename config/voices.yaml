@@ -1,7 +1,46 @@
-# The voice roster. A voice with a credit gets that line appended to its Episodes' show notes.
-# The Pocket TTS voices ticket adds the other voices, engines and speeds.
+# The voice roster (ticket 09 audition, ticket 12 credits). The Skill proposes a voice per
+# Episode and bm_george is the default. A voice with a credit gets that line appended to its
+# Episodes' show notes, Release text and Feed description.
+#
+# speed: a Kokoro voice's base speed. stretch: a Pocket voice's WSOLA time-stretch, since
+# Pocket has no speed control; a Pocket voice without one is read at its own pace. The pacing
+# config's jitter goes on top of either. seed: mixed into each chunk's Pocket seed with the
+# Bundle id, so changing it re-rolls the voice's delivery without touching the Bundles.
+# suits: light hints for the Skill, filled in from the owner's reactions to real Episodes.
+default: bm_george
+
+# Stretches slower than this sounded wrong in the audition (marius at 0.76). Soft: render
+# warns, and a voice that needs more is out of the roster.
+stretch_floor: 0.85
+
 voices:
   bm_george:
     engine: kokoro
-    # Base speed for about 165 wpm with long chunks; the pacing config's jitter goes on top.
+    # Base speed for about 165 wpm with long chunks.
     speed: 1.07
+    suits: [anything]
+  bm_lewis:
+    engine: kokoro
+    speed: 1.12
+    suits: []
+  charles:
+    engine: pocket
+    stretch: 0.905
+    seed: 0
+    suits: []
+    credit: >-
+      Voice: charles (VCTK corpus, CSTR, University of Edinburgh), Kyutai Pocket TTS voices,
+      CC BY 4.0 (https://huggingface.co/kyutai/tts-voices)
+  alba:
+    engine: pocket
+    stretch: 0.907
+    seed: 0
+    suits: []
+    credit: >-
+      Voice: alba (Alba MacKenna), Kyutai Pocket TTS voices, CC BY 4.0
+      (https://huggingface.co/kyutai/tts-voices)
+  # CC0, so no credit.
+  stuart_bell:
+    engine: pocket
+    seed: 0
+    suits: []

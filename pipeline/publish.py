@@ -10,6 +10,7 @@ from pipeline._lib.bundle import BUNDLE_ID, load_meta
 from pipeline._lib.encode import duration_seconds, encode_episode
 from pipeline._lib.github import GitHub
 from pipeline._lib.registry import REGISTRY, dump_registry, load_registry, next_number
+from pipeline._lib.roster import load_roster, with_credit
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -20,6 +21,9 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--dry-run",
         action="store_true",
         help="only encode the .m4a: no Release, registry change or deploy",
+    )
+    parser.add_argument(
+        "--repo", type=Path, default=Path("."), help="the repo checkout, for the voice roster"
     )
 
 
@@ -59,7 +63,11 @@ def main(args: argparse.Namespace, github=None) -> int:
     print(f"publish {episode_id}: encoded {size} bytes", file=sys.stderr)
 
     meta = load_meta(args.bundle)
-    notes = (args.bundle / "show_notes.md").read_text(encoding="utf-8")
+    notes = with_credit(
+        (args.bundle / "show_notes.md").read_text(encoding="utf-8"),
+        load_roster(args.repo),
+        meta["voice"],
+    )
     release = github.create_release(episode_id, f"Episode {number}: {meta['title']}", notes)
     github.upload_asset(release, m4a)
     uploaded = github.asset_sizes(release).get(m4a.name)

@@ -9,6 +9,7 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import pytest
 import yaml
 
 from pipeline import publish
@@ -203,3 +204,38 @@ def integrated_loudness(path):
         check=True,
     )
     return float(re.findall(r"I:\s+(-?[\d.]+) LUFS", run.stderr)[-1])
+
+
+def in_voice(bundle, voice):
+    meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
+    meta["voice"] = voice
+    (bundle / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
+    return bundle
+
+
+@pytest.mark.parametrize(
+    "voice, credit",
+    [
+        ("alba", "Voice: alba (Alba MacKenna), Kyutai Pocket TTS voices, CC BY 4.0"),
+        ("charles", "Voice: charles (VCTK corpus, CSTR, University of Edinburgh)"),
+    ],
+)
+def test_a_cc_by_voice_ends_the_release_text_with_its_credit_line(
+    smoke_bundle, tmp_path, voice, credit
+):
+    github = FakeGitHub()
+
+    assert publish_episode(in_voice(smoke_bundle, voice), tmp_path, github) == 0
+
+    last = github.releases["ep-001-smoke"]["notes"].rstrip().split("\n\n")[-1]
+    assert last.startswith(credit)
+    assert last.endswith("(https://huggingface.co/kyutai/tts-voices)")
+
+
+@pytest.mark.parametrize("voice", ["bm_george", "bm_lewis", "stuart_bell"])
+def test_a_kokoro_or_cc0_voice_gets_no_credit_line(smoke_bundle, tmp_path, voice):
+    github = FakeGitHub()
+
+    assert publish_episode(in_voice(smoke_bundle, voice), tmp_path, github) == 0
+
+    assert "Voice:" not in github.releases["ep-001-smoke"]["notes"]

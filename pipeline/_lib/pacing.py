@@ -58,8 +58,13 @@ def _stronger(gap: str | None, kind: str) -> str:
 
 
 def draw_speed(rng: random.Random, voice_settings: dict, pacing: dict) -> float:
+    """A Kokoro speed or a Pocket stretch, jittered. A voice with neither is read at its own
+    pace, since even a slight stretch adds artefacts the audition didn't hear."""
+    base = voice_settings.get("speed", voice_settings.get("stretch"))
+    if base is None:
+        return 1.0
     jitter = pacing["speed_jitter"]
-    return voice_settings.get("speed", 1.0) + rng.uniform(-jitter, jitter)
+    return base + rng.uniform(-jitter, jitter)
 
 
 def draw_gap(rng: random.Random, gap: dict) -> float:

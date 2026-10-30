@@ -21,7 +21,15 @@ from pipeline._lib.synthesise import RATE, kokoro_lang, synthesise
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("bundle", type=Path, help="the Bundle folder")
-    parser.add_argument("--out", type=Path, required=True, help="the WAV file to write")
+    parser.add_argument("--out", type=Path, help="the WAV file to write")
+    parser.add_argument(
+        "--voice", help="a roster voice to read the Bundle in instead of its own, for dry runs"
+    )
+    parser.add_argument(
+        "--engine",
+        action="store_true",
+        help="print the engine the voice needs and render nothing, so a workflow installs it",
+    )
     parser.add_argument(
         "--repo",
         type=Path,
@@ -31,7 +39,14 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def main(args: argparse.Namespace) -> int:
-    render_bundle(args.bundle, args.out, args.repo)
+    if args.engine:
+        voice = args.voice or load_meta(args.bundle)["voice"]
+        print(_settings(args.bundle, load_roster(args.repo), voice)["engine"])
+        return 0
+    if args.out is None:
+        print("render: --out is needed unless --engine is given", file=sys.stderr)
+        return 2
+    render_bundle(args.bundle, args.out, args.repo, voice=args.voice)
     return 0
 
 
@@ -43,18 +58,18 @@ def render_bundle(
     bundle: Path,
     wav: Path,
     repo: Path = Path("."),
-    synthesise: Callable[[str, str, float], np.ndarray] = synthesise,
+    synthesise: Callable[..., np.ndarray] = synthesise,
+    voice: str | None = None,
 ) -> None:
     """Write the Bundle's Script as a 24 kHz mono WAV, and the chunk map that names each
     chunk's Segment, text and place in the WAV."""
     started = time.perf_counter()
     meta = load_meta(bundle)
-    voice = meta["voice"]
+    voice = voice or meta["voice"]
     roster = load_roster(repo)
-    if voice not in roster:
-        raise RuntimeError(f"render {bundle.name}: voice {voice!r} is not in the voice roster")
+    settings = _settings(bundle, roster, voice)
     pacing = load_pacing(repo)
-    say = _speaker(bundle, repo, meta, roster[voice], pacing, synthesise)
+    say = _speaker(bundle, repo, meta, voice, settings, pacing, synthesise)
     plan = plan_chunks(
         parse_script((bundle / "script.md").read_text(encoding="utf-8")), pacing["chunk_cap"]
     )
@@ -62,13 +77,14 @@ def render_bundle(
     rng = random.Random(bundle.name)
     for chunk in plan:
         chunk["gap_seconds"] = draw_gap(rng, pacing["gaps"][chunk["gap"]]) if chunk["gap"] else 0
-        chunk["speed"] = draw_speed(rng, roster[voice], pacing)
+        _draw_voice(rng, chunk, settings, pacing)
+    _warn_below_floor(bundle, plan, settings, roster)
     timeline: list[np.ndarray] = []
     at = 0
     for index, chunk in enumerate(plan):
         gap = int(RATE * chunk["gap_seconds"])
         timeline.append(np.zeros(gap, dtype=np.float32))
-        audio = say(index, chunk["text"], chunk["speed"])
+        audio = say(index, chunk)
         timeline.append(audio)
         chunk["start"], chunk["end"] = at + gap, at + gap + len(audio)
         at = chunk["end"]
@@ -87,23 +103,26 @@ def rerender_chunk(
     wav: Path,
     index: int,
     repo: Path = Path("."),
-    synthesise: Callable[[str, str, float], np.ndarray] = synthesise,
+    synthesise: Callable[..., np.ndarray] = synthesise,
 ) -> None:
-    """Render one chunk of a rendered WAV again with a fresh speed draw, for a gate that
-    named it. Gaps and every other chunk stay as they were."""
+    """Render one chunk of a rendered WAV again with a fresh speed draw (and a fresh seed for
+    Pocket), for a gate that named it. Gaps and every other chunk stay as they were."""
     started = time.perf_counter()
     meta = load_meta(bundle)
     roster = load_roster(repo)
     pacing = load_pacing(repo)
     chunk_map = yaml.safe_load(chunk_map_path(wav).read_text(encoding="utf-8"))
+    # The chunk map's voice, since a dry run may have read the Bundle in another voice.
+    voice = chunk_map["voice"]
+    settings = _settings(bundle, roster, voice)
     chunks = chunk_map["chunks"]
     chunk = chunks[index]
     # Seeded by the retry count too, so a retry is repeatable but never the first draw again.
     chunk["retries"] = chunk.get("retries", 0) + 1
     rng = random.Random(f"{bundle.name}:{index}:{chunk['retries']}")
-    chunk["speed"] = draw_speed(rng, roster[meta["voice"]], pacing)
-    say = _speaker(bundle, repo, meta, roster[meta["voice"]], pacing, synthesise)
-    audio = say(index, chunk["text"], chunk["speed"])
+    _draw_voice(rng, chunk, settings, pacing)
+    say = _speaker(bundle, repo, meta, voice, settings, pacing, synthesise)
+    audio = say(index, chunk)
     with wave.open(str(wav)) as old:
         samples = np.frombuffer(old.readframes(old.getnframes()), dtype="<i2") / 32767
     shift = len(audio) - (chunk["end"] - chunk["start"])
@@ -120,17 +139,41 @@ def rerender_chunk(
     )
 
 
-def _speaker(bundle, repo, meta, voice_settings, pacing, synthesise):
-    voice = meta["voice"]
-    engine = voice_settings["engine"]
+def _settings(bundle: Path, roster: dict, voice: str) -> dict:
+    if voice not in roster["voices"]:
+        raise RuntimeError(f"render {bundle.name}: voice {voice!r} is not in the voice roster")
+    return roster["voices"][voice]
+
+
+def _draw_voice(rng: random.Random, chunk: dict, settings: dict, pacing: dict) -> None:
+    chunk["speed"] = draw_speed(rng, settings, pacing)
+    # Pocket samples, so each chunk gets its own seed; the roster's seed re-rolls a voice.
+    # Kokoro is deterministic and draws none, which leaves its gaps as they were.
+    if settings["engine"] == "pocket":
+        chunk["seed"] = rng.getrandbits(32) ^ settings.get("seed", 0)
+
+
+def _warn_below_floor(bundle: Path, plan: list[dict], settings: dict, roster: dict) -> None:
+    floor = roster.get("stretch_floor", 0)
+    slow = [c for c in plan if settings["engine"] == "pocket" and c["speed"] < floor]
+    if slow:
+        print(
+            f"render {bundle.name}: {len(slow)} chunks stretched below the {floor} floor, "
+            f"down to {min(c['speed'] for c in slow):.3f}; the roster's stretch wants raising",
+            file=sys.stderr,
+        )
+
+
+def _speaker(bundle, repo, meta, voice, settings, pacing, synthesise):
+    engine = settings["engine"]
     lexicon = load_lexicon(repo, meta)
 
-    def say(index: int, text: str, speed: float) -> np.ndarray:
+    def say(index: int, chunk: dict) -> np.ndarray:
+        text = chunk["text"]
         try:
             said = lexicon.apply(text, engine, kokoro_lang(voice))
-            return _trim(
-                np.asarray(synthesise(said, voice, speed), dtype=np.float32), pacing["trim"]
-            )
+            audio = synthesise(said, voice, chunk["speed"], engine, chunk.get("seed"))
+            return _trim(np.asarray(audio, dtype=np.float32), pacing["trim"])
         except Exception as error:
             raise RuntimeError(
                 f"render {bundle.name}: chunk {index} failed: {text[:60]!r}"

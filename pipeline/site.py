@@ -18,7 +18,7 @@ from pipeline._lib.feed import build_feed, feed_problems
 from pipeline._lib.github import GitHub
 from pipeline._lib.live import live_problems
 from pipeline._lib.registry import REGISTRY, load_registry
-from pipeline._lib.roster import load_roster
+from pipeline._lib.roster import load_roster, with_credit
 
 COVER_SIZE = 3000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -65,10 +65,9 @@ def main(args: argparse.Namespace, github=None) -> int:
     for episode in reversed(episodes):
         bundle = args.repo / "bundles" / episode["bundle_id"]
         meta = load_meta(bundle)
-        notes = (bundle / "show_notes.md").read_text(encoding="utf-8").rstrip()
-        credit = roster.get(episode["voice"], {}).get("credit")
-        if credit:
-            notes += f"\n\n{credit}"
+        notes = with_credit(
+            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, episode["voice"]
+        )
         published = datetime.fromisoformat(github.published_at(episode["episode_id"]))
         items.append(
             {
