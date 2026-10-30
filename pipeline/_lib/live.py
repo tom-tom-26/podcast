@@ -5,6 +5,8 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
+from pipeline._lib.network import retry
+
 
 def live_problems(base: str, episodes: list[dict]) -> list[str]:
     """What the live site gets wrong: Apple needs HEAD and range answers for the Cover and
@@ -48,17 +50,26 @@ def live_problems(base: str, episodes: list[dict]) -> list[str]:
 
 
 def _get(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=60) as response:
-        return response.read()
+    def get():
+        with urllib.request.urlopen(url, timeout=60) as response:
+            return response.read()
+
+    return retry(get, f"GET {url}")
 
 
 def _head(url: str) -> int:
-    request = urllib.request.Request(url, method="HEAD")
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return int(response.headers.get("Content-Length", -1))
+    def head():
+        request = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return int(response.headers.get("Content-Length", -1))
+
+    return retry(head, f"HEAD {url}")
 
 
 def _range(url: str) -> int:
-    request = urllib.request.Request(url, headers={"Range": "bytes=0-99"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return response.status
+    def get_range():
+        request = urllib.request.Request(url, headers={"Range": "bytes=0-99"})
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.status
+
+    return retry(get_range, f"GET {url} with Range")

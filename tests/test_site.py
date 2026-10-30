@@ -3,6 +3,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -276,6 +277,50 @@ def test_live_check_fails_on_missing_audio_or_a_guid_the_feed_lacks(repo, tmp_pa
     assert "Feed is missing ep-003-tides (guid not-deployed)" in err
 
 
+@pytest.fixture
+def bare_site(tmp_path, monkeypatch):
+    """A deployed site with no Episodes, and a record of each wait between retries."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    write_registry(root, [])
+    out = tmp_path / "_site"
+    out.mkdir()
+    (out / "feed.xml").write_text("<rss><channel></channel></rss>", encoding="utf-8")
+    (out / "archive.html").write_text("<html></html>", encoding="utf-8")
+    shutil.copy(REPO / "artwork" / "cover.png", out / "cover.png")
+    waits = []
+    monkeypatch.setattr(time, "sleep", waits.append)
+    return root, out, waits
+
+
+def test_live_check_retries_a_failed_request_and_passes_when_it_recovers(bare_site):
+    root, out, waits = bare_site
+    with serve(out, failures={"/feed.xml": 2}) as base_url:
+        assert check_site(root, base_url) == 0
+
+    assert len(waits) == 2
+    assert all(0 < wait <= 10 for wait in waits)
+
+
+def test_live_check_gives_up_after_two_retries(bare_site, capsys):
+    root, out, waits = bare_site
+    with serve(out, failures={"/feed.xml": 3}) as base_url:
+        assert check_site(root, base_url) == 1
+
+    assert len(waits) == 2
+    assert f"{base_url}/feed.xml: HTTP Error 503" in capsys.readouterr().err
+
+
+def test_live_check_does_not_retry_a_missing_file(bare_site, capsys):
+    root, out, waits = bare_site
+    (out / "cover.png").unlink()
+    with serve(out) as base_url:
+        assert check_site(root, base_url) == 1
+
+    assert waits == []
+    assert "cover.png: HTTP Error 404" in capsys.readouterr().err
+
+
 def build_site(root, out, github, base_url=BASE_URL):
     args = site_args("--repo", root, "--out", out, "--base-url", base_url)
     return site.main(args, github=github)
@@ -315,14 +360,19 @@ def tone_m4a(path, seconds):
 
 
 @contextmanager
-def serve(folder):
-    """Serve a folder over HTTP, answering HEAD and byte-range requests as Pages does."""
+def serve(folder, failures=None):
+    """Serve a folder over HTTP, answering HEAD and byte-range requests as Pages does.
+    failures maps a path to how many GETs of it answer 503 first."""
+    failures = dict(failures or {})
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(folder), **kwargs)
 
         def do_GET(self):
+            if failures.get(self.path, 0) > 0:
+                failures[self.path] -= 1
+                return self.send_error(503)
             match = re.fullmatch(r"bytes=(\d+)-(\d+)", self.headers.get("Range", ""))
             path = Path(self.translate_path(self.path))
             if not match or not path.is_file():

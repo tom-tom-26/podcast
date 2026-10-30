@@ -3,9 +3,18 @@ name: deploy-site
 # publish-episode dispatches this after a publish; the owner can also run it by hand.
 on:
   workflow_dispatch:
+    inputs:
+      bundle:
+        description: "The Bundle whose publish dispatched this, for a failure issue"
+        required: false
+        default: ""
 
 permissions:
   contents: read
+
+env:
+  # Network steps retry at most twice; pip's own default is five.
+  PIP_RETRIES: "2"
 
 jobs:
   deploy:
@@ -32,13 +41,16 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install ffmpeg
-        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+        run: >-
+          command -v ffmpeg || (sudo apt-get -o Acquire::Retries=2 update
+          && sudo apt-get -o Acquire::Retries=2 install -y ffmpeg)
       - run: pip install -e .
       - id: pages
         uses: actions/configure-pages@v6
       # Fails before anything is uploaded if any audio can't be fetched or any check fails,
       # so Pages keeps the last good site.
-      - run: pipeline site --base-url "${{ steps.pages.outputs.base_url }}" --out _site
+      - name: Build the site
+        run: pipeline site --base-url "${{ steps.pages.outputs.base_url }}" --out _site
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/upload-pages-artifact@v5
@@ -61,4 +73,16 @@ jobs:
       # Pages serves with max-age=600 (research/04 section 6), so before then the old Feed
       # may still answer.
       - run: sleep 660
-      - run: pipeline site --base-url "${{ needs.deploy.outputs.page_url }}" --check
+      - name: Check the live site
+        run: pipeline site --base-url "${{ needs.deploy.outputs.page_url }}" --check
+
+  report:
+    needs: [deploy, smoke-check]
+    if: failure()
+    uses: ./.github/workflows/report-failure.yml
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    with:
+      bundle: ${{ inputs.bundle }}

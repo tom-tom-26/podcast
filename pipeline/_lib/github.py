@@ -10,8 +10,11 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from pipeline._lib.network import retry
+
 API = "https://api.github.com"
 UPLOADS = "https://uploads.github.com"
+IDEMPOTENT = {"GET", "PATCH"}
 
 
 class GitHub:
@@ -86,11 +89,53 @@ class GitHub:
     def download_asset(self, tag: str, name: str, dest: Path) -> None:
         # No token: the public URL needs none, and it must not follow the redirect to storage.
         url = self.download_url(tag, name)
-        try:
+
+        def download():
             with urllib.request.urlopen(url, timeout=300) as response, dest.open("wb") as out:
                 shutil.copyfileobj(response, out)
+
+        try:
+            retry(download, f"GET {url}")
         except OSError as error:
             raise RuntimeError(f"GET {url} failed: {error}") from None
+
+    def run_jobs(self, run_id: str) -> list[dict]:
+        query = urllib.parse.urlencode({"per_page": 100})
+        url = f"{API}/repos/{self.repo}/actions/runs/{run_id}/jobs?{query}"
+        return self._request("GET", url)["jobs"]
+
+    def job_log(self, job_id: int) -> str:
+        # GitHub answers with a redirect to storage that must not get the token.
+        url = f"{API}/repos/{self.repo}/actions/jobs/{job_id}/logs"
+
+        def find_log():
+            request = urllib.request.Request(url)
+            request.add_header("Authorization", f"Bearer {self._token}")
+            try:
+                _NO_REDIRECT.open(request, timeout=60)
+            except urllib.error.HTTPError as error:
+                if error.code == 302 and error.headers.get("Location"):
+                    return error.headers["Location"]
+                raise
+            raise RuntimeError(f"GitHub GET {url} gave no redirect to the log")
+
+        def read_log(location):
+            with urllib.request.urlopen(location, timeout=60) as response:
+                return response.read().decode("utf-8", "replace")
+
+        try:
+            location = retry(find_log, f"GET {url}")
+            return retry(lambda: read_log(location), f"GET job {job_id} log")
+        except OSError as error:
+            raise RuntimeError(f"GET job {job_id} log failed: {error}") from None
+
+    def open_issue(self, title: str, body: str, labels: list[str], assignees: list[str]) -> str:
+        issue = self._request(
+            "POST",
+            f"{API}/repos/{self.repo}/issues",
+            {"title": title, "body": body, "labels": labels, "assignees": assignees},
+        )
+        return issue["html_url"]
 
     def _request(self, method, url, body=None, content_type="application/json"):
         if body is not None and content_type == "application/json":
@@ -101,9 +146,23 @@ class GitHub:
         request.add_header("X-GitHub-Api-Version", "2022-11-28")
         if body is not None:
             request.add_header("Content-Type", content_type)
-        try:
+
+        def send():
             with urllib.request.urlopen(request, timeout=300) as response:
                 return json.load(response)
+
+        try:
+            # A POST or a sha-guarded PUT may have landed before its answer was lost, so only
+            # requests that can safely run twice are retried.
+            return retry(send, f"GitHub {method} {url}") if method in IDEMPOTENT else send()
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")[:500]
             raise RuntimeError(f"GitHub {method} {url} failed: {error.code} {detail}") from None
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args):
+        return None
+
+
+_NO_REDIRECT = urllib.request.build_opener(_NoRedirect)
