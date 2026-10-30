@@ -464,3 +464,69 @@ def test_the_parts_of_a_topic_are_dispatched_as_one_publish(branch):
             {"bundle": "2026-11-02-tides-moon 2026-11-02-tides-sun", "dry_run": "false"},
         ),
     ]
+
+
+def backlog(topics):
+    return "# Topic backlog\n\n" + "".join(f"- {topic}\n" for topic in topics)
+
+
+def backlog_pr(github, branch, on_main, on_branch, with_bundle=False):
+    """A PR whose backlog holds these Topic lines, against main's, alone or with the tides
+    Bundle."""
+    github.files["config/backlog.md"] = backlog(on_main)
+    (branch / "config" / "backlog.md").write_text(backlog(on_branch), encoding="utf-8")
+    files = [
+        {"status": "added", "filename": f"{TIDES}/{file}"}
+        for file in ("script.md", "meta.yaml", "show_notes.md", "ledger.md", "lint_report.yaml")
+        if with_bundle
+    ]
+    tides_pr(github, [*files, {"status": "modified", "filename": "config/backlog.md"}])
+
+
+def test_adding_to_the_backlog_merges_and_dispatches_nothing(branch):
+    github = FakeGitHub()
+    backlog_pr(github, branch, ["how tides work"], ["how tides work", "why bridges sway"])
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {12: "abc123"}
+    assert github.dispatches == []
+
+
+def test_a_topic_dropped_from_the_backlog_without_a_new_bundle_needs_the_owner(branch):
+    # "next" removes its line only in the commit that pushes the Bundle, so a queued Topic is
+    # never lost to a run that didn't finish.
+    github = FakeGitHub()
+    backlog_pr(github, branch, ["how tides work", "why bridges sway"], ["why bridges sway"])
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {}
+    assert (
+        "config/backlog.md drops 'how tides work' without a new Bundle; only \"next\" takes a "
+        "Topic off it, in the commit that adds the Episode" in github.comments[12][0]
+    )
+
+
+def test_next_takes_its_topic_off_the_backlog_in_the_bundle_commit(branch):
+    github = FakeGitHub()
+    backlog_pr(github, branch, ["how tides work", "why bridges sway"], ["why bridges sway"], True)
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {12: "abc123"}
+    assert github.dispatches == [
+        ("publish-episode.yml", {"bundle": "2026-11-02-tides", "dry_run": "false"})
+    ]
+
+
+def test_one_bundle_taking_two_topics_off_the_backlog_needs_the_owner(branch):
+    github = FakeGitHub()
+    backlog_pr(github, branch, ["how tides work", "why bridges sway", "salt"], ["salt"], True)
+
+    run_merge(github, branch)
+
+    assert github.merged == {}
+    assert (
+        'config/backlog.md drops 2 Topics; "next" takes one per Episode' in github.comments[12][0]
+    )

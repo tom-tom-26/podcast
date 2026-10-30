@@ -18,11 +18,12 @@ from pipeline._lib.window import PIN_LIST
 LABEL = "needs-owner"
 
 PHRASE_LIST = "config/deslop_rules.yaml"
+BACKLOG = "config/backlog.md"
 # Data the Skill writes in a run, each cheap to undo (spec, Workflows > auto-merge).
 ALWAYS_ALLOWED = {
     PIN_LIST,
     "config/listener_profile.md",
-    "config/backlog.md",
+    BACKLOG,
     "config/lexicon.yaml",
     PHRASE_LIST,
 }
@@ -100,6 +101,21 @@ def main(args: argparse.Namespace, github=None) -> int:
                     decision.refusals.append(
                         f"{PHRASE_LIST} drops {phrase!r}; feedback only adds phrases"
                     )
+    # "next" takes its one Topic off only in the commit that adds the Episode, so a run that
+    # stopped short can't lose a queued Topic.
+    if ("modified", BACKLOG) in changes:
+        after = _topics((args.repo / BACKLOG).read_text(encoding="utf-8"))
+        dropped = [t for t in _topics(github.read_file(BACKLOG)[0]) if t not in after]
+        if not any(b not in published for b in decision.lint):
+            decision.refusals += [
+                f'{BACKLOG} drops {topic!r} without a new Bundle; only "next" takes a '
+                "Topic off it, in the commit that adds the Episode"
+                for topic in dropped
+            ]
+        elif len(dropped) > 1:
+            decision.refusals.append(
+                f'{BACKLOG} drops {len(dropped)} Topics; "next" takes one per Episode'
+            )
 
     for bundle_id in decision.lint:
         checked = argparse.Namespace(
@@ -148,6 +164,10 @@ def main(args: argparse.Namespace, github=None) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+def _topics(text: str) -> list[str]:
+    return [line[2:].strip() for line in text.splitlines() if line.startswith("- ")]
 
 
 def _revision(text: str):
