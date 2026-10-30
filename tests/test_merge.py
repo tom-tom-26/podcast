@@ -464,3 +464,55 @@ def test_the_parts_of_a_topic_are_dispatched_as_one_publish(branch):
             {"bundle": "2026-11-02-tides-moon 2026-11-02-tides-sun", "dry_run": "false"},
         ),
     ]
+
+
+def backlog_pr(github, branch, on_main, on_branch, files=()):
+    """A PR whose backlog holds these Topic lines, against main's."""
+    github.files["config/backlog.md"] = "# Topic backlog\n\n" + "".join(
+        f"- {topic}\n" for topic in on_main
+    )
+    (branch / "config" / "backlog.md").write_text(
+        "# Topic backlog\n\n" + "".join(f"- {topic}\n" for topic in on_branch), encoding="utf-8"
+    )
+    tides_pr(github, [*files, {"status": "modified", "filename": "config/backlog.md"}])
+
+
+def test_adding_to_the_backlog_merges_and_dispatches_nothing(branch):
+    github = FakeGitHub()
+    backlog_pr(github, branch, ["how tides work"], ["how tides work", "why bridges sway"])
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {12: "abc123"}
+    assert github.dispatches == []
+
+
+def test_a_topic_dropped_from_the_backlog_without_a_new_bundle_needs_the_owner(branch):
+    # "next" removes its line only in the commit that pushes the Bundle, so a queued Topic is
+    # never lost to a run that didn't finish.
+    github = FakeGitHub()
+    backlog_pr(github, branch, ["how tides work", "why bridges sway"], ["why bridges sway"])
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {}
+    assert (
+        "config/backlog.md drops 'how tides work' without a new Bundle; only \"next\" takes a "
+        "Topic off it, in the commit that adds the Episode" in github.comments[12][0]
+    )
+
+
+def test_next_takes_its_topic_off_the_backlog_in_the_bundle_commit(branch):
+    github = FakeGitHub()
+    bundle = [
+        {"status": "added", "filename": f"{TIDES}/{file}"}
+        for file in ("script.md", "meta.yaml", "show_notes.md", "ledger.md", "lint_report.yaml")
+    ]
+    backlog_pr(github, branch, ["how tides work", "why bridges sway"], ["why bridges sway"], bundle)
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {12: "abc123"}
+    assert github.dispatches == [
+        ("publish-episode.yml", {"bundle": "2026-11-02-tides", "dry_run": "false"})
+    ]

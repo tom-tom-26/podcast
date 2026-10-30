@@ -1,6 +1,6 @@
 ---
 name: episode
-description: Make a Plainly Put Episode. Use when the owner names a Topic to make an Episode about ("caffeine and sleep", "how tides work, deep"), asks questions about a published Episode for a Q&A ("7: does decaf count?"), or gives feedback on one ("feedback 7: too long"), including a wrong fact to correct. Researches the Topic, writes the Script, Claim ledger and show notes as a Bundle, lints it and pushes it on a claude/ branch for the Pipeline to publish.
+description: Make a Plainly Put Episode. Use when the owner names a Topic to make an Episode about ("caffeine and sleep", "how tides work, deep"), asks questions about a published Episode for a Q&A ("7: does decaf count?"), or gives feedback on one ("feedback 7: too long"), including a wrong fact to correct. Also for "next" (the top of the Topic backlog), "add to backlog: X" and "bring back episode X". Researches the Topic, writes the Script, Claim ledger and show notes as a Bundle, lints it and pushes it on a claude/ branch for the Pipeline to publish.
 ---
 
 # Episode
@@ -9,7 +9,7 @@ The owner names a Topic from their phone. This Skill turns it into a Bundle on a
 
 The owner spends about a minute on an Episode: the Topic, then one reply to the confirm message. Never ask them anything else. When something is unclear after their reply, make the most reasonable call and say what you chose in the final message.
 
-Three modes are built. **Episode mode** is the steps below. **Q&A mode** is for a summon that names a published Episode, by number or title words, plus one or more questions ("7: does decaf count?"): read `references/qa.md` before step 1 and follow it wherever it differs from the steps below. **Feedback mode** is for reactions, instructions and Corrections ("feedback 7: too long, and it said 'Kokoro' wrong"), alone or dropped into another summon: read `references/feedback.md` and follow it. It has no Topic: it runs "Before step 1", then its own steps, using step 5's lint and step 6's push from here. If the owner says "next", "add to backlog: X" or "bring back episode X", say that mode isn't built yet and stop. Never suggest Topics.
+Three modes are built. **Episode mode** is the steps below. **Q&A mode** is for a summon that names a published Episode, by number or title words, plus one or more questions ("7: does decaf count?"): read `references/qa.md` before step 1 and follow it wherever it differs from the steps below. **Feedback mode** is for reactions, instructions and Corrections ("feedback 7: too long, and it said 'Kokoro' wrong"), alone or dropped into another summon: read `references/feedback.md` and follow it. It has no Topic: it runs "Before step 1", then its own steps, using step 5's lint and step 6's push from here. "next" (take the top Topic off the Topic backlog), "add to backlog: X" and "bring back episode X" change `config/backlog.md` or `pinned.txt`: read `references/backlog.md` and follow it. Never suggest Topics.
 
 ## References
 
@@ -23,6 +23,7 @@ Read each one when its step comes up, not all at the start.
 | `references/deslop.md` | Firm rules F1-F9, the soft checklist, the ten-question self-review | step 3, again at step 4 |
 | `references/learnings.md` | What a lesson is, the line format, Source profile rules, compaction, push conflicts, "Learned this run" | before step 1, again at step 6 |
 | `references/qa.md` | Q&A mode: finding the parent, the confirm, research, the Q&A shape, the Listener profile | before step 1, in Q&A mode only |
+| `references/backlog.md` | "next", "add to backlog: X" and "bring back episode X" | before step 1 on "next", again at step 6; for the other two, instead of the steps |
 | `references/feedback.md` | Feedback mode: sorting remarks, instructions and reactions, Corrections, the Owner-instructed commit | in Feedback mode, or when feedback comes with another summon; at step 2 for the overlap check |
 
 ## Before step 1
@@ -89,13 +90,13 @@ If you can't make a Bundle pass, don't push. Say what blocks in the final messag
 
 ## 6. Push
 
-One commit holds the whole run: the Bundle (every Part, for a split Topic), this run's Learnings changes, a Q&A's Listener profile observation, and nothing outside the auto-merge allow-list. A path outside it leaves the PR for the owner.
+One commit holds the whole run: the Bundle (every Part, for a split Topic), this run's Learnings changes, a Q&A's Listener profile observation, any backlog or pin-list edit (`references/backlog.md`), and nothing outside the auto-merge allow-list. A path outside it leaves the PR for the owner.
 
 First write this run's lessons, `seen` raises and any compaction into `learnings/`, following `references/learnings.md`. A smooth run changes nothing in `learnings/`.
 
 ```
 git checkout -b claude/<slug> origin/main
-git add bundles/<Bundle id> learnings config/listener_profile.md
+git add bundles/<Bundle id> learnings config/listener_profile.md config/backlog.md pinned.txt
 git commit -m "Add the <title> Episode"
 git fetch origin main && git rebase origin/main
 pipeline lint bundles/<Bundle id>
