@@ -101,18 +101,21 @@ def main(args: argparse.Namespace, github=None) -> int:
                     decision.refusals.append(
                         f"{PHRASE_LIST} drops {phrase!r}; feedback only adds phrases"
                     )
-    # "next" takes its Topic off only in the commit that adds the Episode, so a run that
+    # "next" takes its one Topic off only in the commit that adds the Episode, so a run that
     # stopped short can't lose a queued Topic.
-    if any(path == BACKLOG for _, path in changes) and not any(
-        b not in published for b in decision.lint
-    ):
+    if ("modified", BACKLOG) in changes:
         after = _topics((args.repo / BACKLOG).read_text(encoding="utf-8"))
-        for topic in _topics(github.read_file(BACKLOG)[0]):
-            if topic not in after:
-                decision.refusals.append(
-                    f'{BACKLOG} drops {topic!r} without a new Bundle; only "next" takes a '
-                    "Topic off it, in the commit that adds the Episode"
-                )
+        dropped = [t for t in _topics(github.read_file(BACKLOG)[0]) if t not in after]
+        if not any(b not in published for b in decision.lint):
+            decision.refusals += [
+                f'{BACKLOG} drops {topic!r} without a new Bundle; only "next" takes a '
+                "Topic off it, in the commit that adds the Episode"
+                for topic in dropped
+            ]
+        elif len(dropped) > 1:
+            decision.refusals.append(
+                f'{BACKLOG} drops {len(dropped)} Topics; "next" takes one per Episode'
+            )
 
     for bundle_id in decision.lint:
         checked = argparse.Namespace(
