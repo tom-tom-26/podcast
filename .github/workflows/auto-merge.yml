@@ -18,10 +18,12 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # A newer push to the branch replaces the run deciding on the older one.
+    # Runs for one PR queue rather than cancel, since a cancel between the merge and the
+    # dispatch would leave a merged Bundle unpublished. A queued run finds the head moved on,
+    # or the PR merged, and stops.
     concurrency:
       group: auto-merge-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
@@ -50,8 +52,8 @@ jobs:
 
   report:
     needs: merge
-    # Not on cancelled: a newer push cancels a run on purpose.
-    if: failure()
+    # A job cut off by its timeout ends cancelled, which failure() alone would miss.
+    if: failure() || cancelled()
     uses: ./.github/workflows/report-failure.yml
     permissions:
       actions: read

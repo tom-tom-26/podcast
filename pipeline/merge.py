@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 from pipeline import lint
 from pipeline._lib.bundle import BUNDLE_FILES, BUNDLE_ID
 from pipeline._lib.github import GitHub
@@ -15,13 +17,14 @@ from pipeline._lib.registry import REGISTRY, load_registry
 LABEL = "needs-owner"
 
 PIN_LIST = "pinned.txt"
+PHRASE_LIST = "config/deslop_rules.yaml"
 # Data the Skill writes in a run, each cheap to undo (spec, Workflows > auto-merge).
 ALWAYS_ALLOWED = {
     PIN_LIST,
     "config/listener_profile.md",
     "config/backlog.md",
     "config/lexicon.yaml",
-    "config/deslop_rules.yaml",
+    PHRASE_LIST,
 }
 # Defaults every later Episode follows, so only the owner's own instruction may change them.
 OWNER_INSTRUCTED = {"config/template.yaml", "config/voices.yaml"}
@@ -51,10 +54,15 @@ def main(args: argparse.Namespace, github=None) -> int:
     if not head.startswith("claude/"):
         print(f"merge: PR #{args.pr} is from {head}, not a claude/ branch", file=sys.stderr)
         return 1
+    # Runs for one PR queue, so this one may wake to find an earlier run merged it.
+    if pull["state"] != "open":
+        print(f"merge: PR #{args.pr} is {pull['state']}; nothing to do", file=sys.stderr)
+        return 0
     # The changed-file list is the head's as it is now, so it must be the commit lint reads.
     if pull["head"]["sha"] != args.sha:
         print(
-            f"merge: PR #{args.pr} has moved on from {args.sha}; the run for its new head decides",
+            f"merge: PR #{args.pr} has moved on from {args.sha}; the run for its new head "
+            f"decides, {time.perf_counter() - started:.1f} s",
             file=sys.stderr,
         )
         return 0
@@ -69,6 +77,17 @@ def main(args: argparse.Namespace, github=None) -> int:
     # The registry on main, since only a publish writes it and the branch may be behind.
     published = {e["bundle_id"] for e in load_registry(github.read_file(REGISTRY)[0])}
     decision = decide(changes, message, published)
+    # Lint reads the branch's phrase list, so a branch that dropped a firm phrase could pass
+    # the very rule its Bundle fails. Feedback mode only ever adds phrases.
+    if any(path == PHRASE_LIST for _, path in changes):
+        before = yaml.safe_load(github.read_file(PHRASE_LIST)[0])
+        after = yaml.safe_load((args.repo / PHRASE_LIST).read_text(encoding="utf-8"))
+        for key in ("block", "warn", "show_notes"):
+            for phrase in before.get(key) or []:
+                if phrase not in (after.get(key) or []):
+                    decision.refusals.append(
+                        f"{PHRASE_LIST} drops {phrase!r}; feedback only adds phrases"
+                    )
 
     for bundle_id in decision.lint:
         checked = argparse.Namespace(
@@ -91,6 +110,9 @@ def main(args: argparse.Namespace, github=None) -> int:
         )
         return 0
 
+    # Left by an earlier push that needed the owner; this head no longer does.
+    if any(label["name"] == LABEL for label in pull["labels"]):
+        github.remove_label(args.pr, LABEL)
     # Pinned to the head that was decided on, so a push since then can't slip in unchecked.
     github.squash_merge(args.pr, args.sha)
     # A merge made with GITHUB_TOKEN triggers no workflow, so each is dispatched by hand.

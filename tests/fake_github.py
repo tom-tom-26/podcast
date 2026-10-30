@@ -90,7 +90,15 @@ class FakeGitHub:
     def pull_request(self, number):
         self.calls.append("pull_request")
         pull = self.pulls[number]
-        return {"head": {"ref": pull["head"], "sha": pull["sha"]}, "state": "open"}
+        return {
+            "head": {"ref": pull["head"], "sha": pull["sha"]},
+            "state": "closed" if number in self.merged else "open",
+            "labels": [{"name": name} for name in self.labels.get(number, [])],
+        }
+
+    def remove_label(self, number, label):
+        self.calls.append("remove_label")
+        self.labels[number].remove(label)
 
     def pull_files(self, number):
         self.calls.append("pull_files")

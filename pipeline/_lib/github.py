@@ -161,6 +161,10 @@ class GitHub:
         url = f"{API}/repos/{self.repo}/issues/{number}/labels"
         self._request("POST", url, {"labels": labels})
 
+    def remove_label(self, number: int, label: str) -> None:
+        url = f"{API}/repos/{self.repo}/issues/{number}/labels/{urllib.parse.quote(label)}"
+        self._request("DELETE", url)
+
     def comment(self, number: int, body: str) -> None:
         self._request("POST", f"{API}/repos/{self.repo}/issues/{number}/comments", {"body": body})
 

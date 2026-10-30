@@ -286,3 +286,65 @@ def test_a_branch_outside_claude_is_left_alone(branch):
     assert run_merge(github, branch) == 1
 
     assert github.merged == {} and github.labels == {}
+
+
+def phrase_list_pr(github, branch, block):
+    """A PR whose phrase list keeps only these firm phrases, against main's full list."""
+    rules = REPO / "config" / "deslop_rules.yaml"
+    github.files["config/deslop_rules.yaml"] = rules.read_text(encoding="utf-8")
+    phrases = yaml.safe_load(rules.read_text(encoding="utf-8"))
+    phrases["block"] = block
+    (branch / "config" / "deslop_rules.yaml").write_text(yaml.safe_dump(phrases), encoding="utf-8")
+    tides_pr(github, [{"status": "modified", "filename": "config/deslop_rules.yaml"}])
+    return phrases
+
+
+def test_a_phrase_list_that_drops_a_firm_phrase_needs_the_owner(branch):
+    # Otherwise a branch could lift the very rule its own Bundle fails.
+    github = FakeGitHub()
+    main_block = yaml.safe_load(
+        (REPO / "config" / "deslop_rules.yaml").read_text(encoding="utf-8")
+    )["block"]
+    phrase_list_pr(github, branch, [p for p in main_block if p != "without further ado"])
+
+    run_merge(github, branch)
+
+    assert github.merged == {}
+    assert (
+        "config/deslop_rules.yaml drops 'without further ado'; feedback only adds phrases"
+        in github.comments[12][0]
+    )
+
+
+def test_a_phrase_list_that_only_adds_merges(branch):
+    github = FakeGitHub()
+    main_block = yaml.safe_load(
+        (REPO / "config" / "deslop_rules.yaml").read_text(encoding="utf-8")
+    )["block"]
+    phrase_list_pr(github, branch, main_block + ["at the end of the day"])
+
+    run_merge(github, branch)
+
+    assert github.merged == {12: "abc123"}
+
+
+def test_a_pr_that_now_passes_loses_its_needs_owner_label(branch):
+    github = FakeGitHub()
+    tides_pr(github)
+    github.labels[12] = ["needs-owner"]
+
+    run_merge(github, branch)
+
+    assert github.merged == {12: "abc123"}
+    assert github.labels[12] == []
+
+
+def test_a_run_queued_behind_the_merge_does_nothing(branch):
+    github = FakeGitHub()
+    tides_pr(github)
+    run_merge(github, branch)
+    github.dispatches.clear()
+
+    assert run_merge(github, branch) == 0
+
+    assert github.dispatches == [] and github.comments == {}
