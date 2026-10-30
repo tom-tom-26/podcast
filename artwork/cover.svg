@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="3000" viewBox="0 0 3000 3000">
+  <rect width="3000" height="3000" fill="#16233B"/>
+  <g fill="#F2E8D5" font-family="DM Serif Display" font-size="600" text-anchor="middle">
+    <text x="1500" y="1290">Plainly</text>
+    <text x="1500" y="1870">Put</text>
+  </g>
+  <rect x="1050" y="2090" width="900" height="16" fill="#F2E8D5"/>
+</svg>

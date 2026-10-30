@@ -16,6 +16,8 @@
 
 **Feed**: The podcast RSS feed that Apple Podcasts subscribes to.
 
+**Cover**: The show's one square artwork, used by the Feed for the show and every Episode. Drawn as code in `artwork/`; there is no per-Episode art.
+
 **Host**: The voice presenting the Episode.
 
 **Claim ledger**: The compact record built while researching: one line per claim with its source and evidence tier. Doubles as the Episode's source list.
