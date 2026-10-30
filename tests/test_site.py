@@ -172,6 +172,30 @@ def test_a_qa_episode_is_a_bonus_item(repo, tmp_path):
     assert smoke.findtext("itunes:episodeType", namespaces=NS) == "full"
 
 
+def test_parts_are_full_items_and_a_qa_is_a_bonus_item_on_its_own_date(repo, tmp_path):
+    root, github = repo
+    add_episode(root, github, "3a", "ep-003a-tides", "2026-11-05T09:00:00Z")
+    add_episode(root, github, "3b", "ep-003b-tides", "2026-11-05T09:00:01Z")
+    add_episode(root, github, "3q", "ep-003q-tides", "2026-11-09T07:15:00Z")
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    qa, part_b, part_a, *_ = feed(out).find("channel").findall("item")
+    # The title is the Bundle's own, with no "Follow-up" or "Q&A" wording added.
+    assert [i.findtext("title") for i in (qa, part_b, part_a)] == [
+        "Episode 3q: How tides work",
+        "Episode 3b: How tides work",
+        "Episode 3a: How tides work",
+    ]
+    assert [i.findtext("itunes:episodeType", namespaces=NS) for i in (qa, part_b, part_a)] == [
+        "bonus",
+        "full",
+        "full",
+    ]
+    assert qa.findtext("pubDate") == "Mon, 09 Nov 2026 07:15:00 +0000"
+
+
 def test_archive_page_lists_every_episode_newest_first_and_is_noindex(repo, tmp_path):
     root, github = repo
     out = tmp_path / "_site"

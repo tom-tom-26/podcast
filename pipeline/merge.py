@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 from pipeline import lint
-from pipeline._lib.bundle import BUNDLE_FILES, BUNDLE_ID
+from pipeline._lib.bundle import BUNDLE_FILES, BUNDLE_ID, load_meta
 from pipeline._lib.github import GitHub
 from pipeline._lib.registry import REGISTRY, load_registry
 from pipeline._lib.window import PIN_LIST
@@ -116,11 +116,12 @@ def main(args: argparse.Namespace, github=None) -> int:
     # Pinned to the head that was decided on, so a push since then can't slip in unchecked.
     github.squash_merge(args.pr, args.sha)
     # A merge made with GITHUB_TOKEN triggers no workflow, so each is dispatched by hand.
-    for bundle_id in decision.publish:
-        github.dispatch("publish-episode.yml", {"bundle": bundle_id, "dry_run": "false"})
+    groups = _publish_groups(decision.publish, args.repo)
+    for group in groups:
+        github.dispatch("publish-episode.yml", {"bundle": group, "dry_run": "false"})
     if decision.deploy:
         github.dispatch("deploy-site.yml", {})
-    dispatched = [f"publish-episode for {b}" for b in decision.publish]
+    dispatched = [f"publish-episode for {group}" for group in groups]
     dispatched += ["deploy-site"] if decision.deploy else []
     print(
         f"merge: PR #{args.pr} merged, {len(changes)} paths, dispatched "
@@ -128,6 +129,17 @@ def main(args: argparse.Namespace, github=None) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+def _publish_groups(bundle_ids: list[str], repo: Path) -> list[str]:
+    """One publish-episode input per Episode: a Bundle id, or the Bundle ids of every Part of
+    a topic in Part order, since Parts publish together or not at all."""
+    groups: dict[str, list[tuple[int, str]]] = {}
+    for bundle_id in bundle_ids:
+        part = load_meta(repo / "bundles" / bundle_id).get("part")
+        key = f"part {part['series_slug']}" if part else bundle_id
+        groups.setdefault(key, []).append((part["n"] if part else 1, bundle_id))
+    return [" ".join(bundle_id for _, bundle_id in sorted(group)) for group in groups.values()]
 
 
 @dataclass

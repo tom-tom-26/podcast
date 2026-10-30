@@ -7,7 +7,8 @@ from pipeline._lib.lexicon import entry_problems
 from pipeline._lib.script import ScriptError, parse_script
 
 BUNDLE_FILES = ["script.md", "meta.yaml", "show_notes.md", "ledger.md", "lint_report.yaml"]
-BUNDLE_ID = re.compile(r"\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*")
+SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+BUNDLE_ID = re.compile(rf"\d{{4}}-\d{{2}}-\d{{2}}-{SLUG.pattern}")
 VARIANTS = {"Quick", "Standard", "Deep"}
 
 
@@ -56,10 +57,30 @@ def _meta_problems(path: Path) -> list[str]:
         if not _whole_number(meta.get(key))
     ]
     problems += [f"pronunciations: {p}" for p in entry_problems(meta.get("pronunciations"))]
+    problems += _part_problems(meta)
     revision = meta.get("revision")
     if not _whole_number(revision):
         problems.append("revision must be a whole number from 1")
     return problems
+
+
+def _part_problems(meta: dict) -> list[str]:
+    part = meta.get("part")
+    if part is None:
+        return []
+    # Letters a-c name the Parts, so a topic splits into 2 or 3 (ticket 01).
+    if (
+        not isinstance(part, dict)
+        or not all(_whole_number(part.get(key)) for key in ("n", "of"))
+        or not 2 <= part["of"] <= 3
+        or part["n"] > part["of"]
+        or not isinstance(part.get("series_slug"), str)
+        or not SLUG.fullmatch(part["series_slug"])
+    ):
+        return ["part must be null or {n, of, series_slug} with n from 1 to of, and of 2 or 3"]
+    if meta.get("parent_episode"):
+        return ["parent_episode: a Q&A stands alone, so it is never a Part"]
+    return []
 
 
 def _whole_number(value) -> bool:

@@ -478,3 +478,142 @@ def test_an_asr_fail_beside_a_whole_file_fail_stops_without_a_re_render(
     assert "asr gate failed" in err and "loudness gate failed" in err
     assert "re-rendering" not in err
     assert len(engine.calls) == rendered
+
+
+def as_qa(bundle, bundle_id, parent, title="Why sunsets are red"):
+    qa = another_bundle(bundle, bundle_id, title)
+    meta = yaml.safe_load((qa / "meta.yaml").read_text(encoding="utf-8"))
+    meta.update(parent_episode=parent, questions=["Why are sunsets red, then?"])
+    (qa / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
+    return qa
+
+
+def test_a_qa_whose_parent_is_not_published_is_refused(smoke_bundle, tmp_path, capsys):
+    github = FakeGitHub()
+    qa = as_qa(smoke_bundle, "2026-11-03-sunsets", "ep-001-smoke")
+
+    assert publish_episode(qa, tmp_path, github) == 1
+
+    assert "parent ep-001-smoke is not published" in capsys.readouterr().err
+    assert github.calls == ["read_file"]
+
+
+def as_part(bundle, bundle_id, n, of, title, series="tides"):
+    part = another_bundle(bundle, bundle_id, title)
+    meta = yaml.safe_load((part / "meta.yaml").read_text(encoding="utf-8"))
+    meta["part"] = {"n": n, "of": of, "series_slug": series}
+    (part / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
+    return part
+
+
+def publish_group(bundles, tmp_path, github, cut_short=()):
+    """Render each Bundle to its own WAV with a fake engine and publish them as one group. The
+    transcriber hears each take as written, except that the Bundles named in cut_short lose
+    their last five words."""
+    wavs = [tmp_path / f"{bundle.name}.wav" for bundle in bundles]
+    engine = SpeechlikeEngine()
+    for bundle, wav in zip(bundles, wavs, strict=True):
+        render.render_bundle(bundle, wav, repo=REPO, synthesise=engine)
+
+    def transcribe(m4a):
+        heard = heard_as_written(tmp_path / f"{m4a.parent.name}.wav")(m4a).split()
+        return " ".join(heard[:-5] if m4a.parent.name in cut_short else heard)
+
+    parser = argparse.ArgumentParser()
+    publish.add_arguments(parser)
+    args = parser.parse_args(
+        [*map(str, bundles), "--wav", *map(str, wavs), "--out-dir", str(tmp_path / "out"),
+         "--repo", str(REPO)]
+    )  # fmt: skip
+    return publish.main(args, github=github, transcribe=transcribe, synthesise=engine)
+
+
+def tides_parts(smoke_bundle):
+    return [
+        as_part(smoke_bundle, "2026-11-04-tides-moon", 1, 2, "The Moon and the tides"),
+        as_part(smoke_bundle, "2026-11-04-tides-sun", 2, 2, "The Sun and the tides"),
+    ]
+
+
+def test_parts_publish_as_one_number_with_letters_in_one_registry_commit(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    publish_episode(smoke_bundle, tmp_path, github)
+    commits = len(github.commits)
+
+    assert publish_group(tides_parts(smoke_bundle), tmp_path, github) == 0
+
+    entries = registry(github)[1:]
+    assert [(e["number"], e["episode_id"]) for e in entries] == [
+        ("2a", "ep-002a-tides-moon"),
+        ("2b", "ep-002b-tides-sun"),
+    ]
+    assert len(github.commits) == commits + 1
+    assert github.releases["ep-002a-tides-moon"]["title"] == "Episode 2a: The Moon and the tides"
+    assert github.releases["ep-002b-tides-sun"]["title"] == "Episode 2b: The Sun and the tides"
+    assert not github.releases["ep-002b-tides-sun"]["draft"]
+    assert entries[0]["guid"] != entries[1]["guid"]
+    assert entries[1]["file"] == "ep-002b-tides-sun.m4a"
+
+
+def test_if_one_part_fails_a_gate_no_part_is_published(smoke_bundle, tmp_path, capsys):
+    github = FakeGitHub()
+    moon, sun = tides_parts(smoke_bundle)
+
+    code = publish_group([moon, sun], tmp_path, github, cut_short={sun.name})
+
+    assert code == 1
+    assert "a Part failed, so no Part is published" in capsys.readouterr().err
+    assert github.releases == {}
+    assert registry(github) == []
+
+
+def test_a_part_without_the_rest_of_its_group_is_refused(smoke_bundle, tmp_path, capsys):
+    github = FakeGitHub()
+    moon, _ = tides_parts(smoke_bundle)
+
+    assert publish_group([moon], tmp_path, github) == 1
+
+    assert "every Part publishes in one group" in capsys.readouterr().err
+    assert github.calls == ["read_file"]
+
+
+def test_qas_take_the_parent_number_and_letters_from_q(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    publish_episode(smoke_bundle, tmp_path, github)
+    for day, slug in enumerate(["sunsets", "clouds"], start=3):
+        qa = as_qa(smoke_bundle, f"2026-11-0{day}-{slug}", "ep-001-smoke")
+        assert publish_episode(qa, tmp_path, github) == 0
+    tides = another_bundle(smoke_bundle, "2026-11-06-tides", "How tides work")
+    assert publish_episode(tides, tmp_path, github) == 0
+
+    assert [(e["number"], e["episode_id"]) for e in registry(github)] == [
+        ("1", "ep-001-smoke"),
+        ("1q", "ep-001q-sunsets"),
+        ("1r", "ep-001r-clouds"),
+        ("2", "ep-002-tides"),
+    ]
+    assert github.releases["ep-001q-sunsets"]["title"] == "Episode 1q: Why sunsets are red"
+
+
+def test_a_qa_on_a_part_takes_the_topic_number(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    publish_group(tides_parts(smoke_bundle), tmp_path / "parts", github)
+    qa = as_qa(smoke_bundle, "2026-11-07-spring-tides", "ep-001b-tides-sun", "Spring tides")
+
+    assert publish_episode(qa, tmp_path, github) == 0
+
+    assert registry(github)[-1]["episode_id"] == "ep-001q-spring-tides"
+
+
+def test_after_z_qa_letters_run_z2_z3(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    taken = ["1", *"qrstuvwxyz", "z2"]
+    github.files["episodes.yaml"] = yaml.safe_dump(
+        {"episodes": [{"number": n, "episode_id": f"ep-001{n[1:]}-x", "bundle_id": f"b{n}"}
+                      for n in taken]}
+    )  # fmt: skip
+    qa = as_qa(smoke_bundle, "2026-11-03-sunsets", "ep-001-x")
+
+    assert publish_episode(qa, tmp_path, github) == 0
+
+    assert registry(github)[-1]["number"] == "1z3"

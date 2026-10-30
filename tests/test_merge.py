@@ -348,3 +348,26 @@ def test_a_run_queued_behind_the_merge_does_nothing(branch):
     assert run_merge(github, branch) == 0
 
     assert github.dispatches == [] and github.comments == {}
+
+
+def test_the_parts_of_a_topic_are_dispatched_as_one_publish(branch):
+    parts = ["bundles/2026-11-02-tides-moon", "bundles/2026-11-02-tides-sun"]
+    for n, path in enumerate(parts, start=1):
+        shutil.copytree(branch / TIDES, branch / path)
+        meta_path = branch / path / "meta.yaml"
+        meta = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+        meta["part"] = {"n": n, "of": 2, "series_slug": "tides"}
+        meta_path.write_text(yaml.safe_dump(meta), encoding="utf-8")
+    github = FakeGitHub()
+    files = [{"status": "added", "filename": f"{path}/meta.yaml"} for path in [*parts, TIDES]]
+    tides_pr(github, files)
+
+    assert run_merge(github, branch) == 0
+
+    assert github.dispatches == [
+        ("publish-episode.yml", {"bundle": "2026-11-02-tides", "dry_run": "false"}),
+        (
+            "publish-episode.yml",
+            {"bundle": "2026-11-02-tides-moon 2026-11-02-tides-sun", "dry_run": "false"},
+        ),
+    ]
