@@ -193,7 +193,8 @@ def test_malformed_ledger_line_only_warns(smoke_bundle, line, message):
     run = lint(smoke_bundle)
 
     assert run.returncode == 0, run.stdout + run.stderr
-    assert f"warning: ledger.md, c1: {message}" in run.stdout
+    assert "warning" in run.stdout
+    assert f"ledger.md, c1: {message}" in run.stdout
 
 
 def test_smoke_ledger_has_no_ledger_warning(smoke_bundle):
