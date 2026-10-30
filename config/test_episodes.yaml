@@ -1,0 +1,4 @@
+# The test registry, written by hand. site builds test/feed.xml from it for the real-device
+# checks; nobody follows that feed for listening. Entries take the Episode registry's fields
+# with their own guids, plus `enclosure: release` to point at the Release download URL.
+episodes: []

@@ -13,10 +13,10 @@ from pipeline import lint
 from pipeline._lib.bundle import BUNDLE_FILES, BUNDLE_ID
 from pipeline._lib.github import GitHub
 from pipeline._lib.registry import REGISTRY, load_registry
+from pipeline._lib.window import PIN_LIST
 
 LABEL = "needs-owner"
 
-PIN_LIST = "pinned.txt"
 PHRASE_LIST = "config/deslop_rules.yaml"
 # Data the Skill writes in a run, each cheap to undo (spec, Workflows > auto-merge).
 ALWAYS_ALLOWED = {

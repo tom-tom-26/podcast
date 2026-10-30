@@ -29,7 +29,10 @@ NS = {
 def repo(tmp_path, smoke_bundle):
     """A repo with two published Episodes: the smoke Bundle, then a second about tides."""
     root = tmp_path / "repo"
-    for path in ["config/show.yaml", "config/voices.yaml", "artwork/cover.png"]:
+    for path in [
+        "config/show.yaml", "config/voices.yaml", "config/site.yaml", "config/test_episodes.yaml",
+        "artwork/cover.png", "pinned.txt",
+    ]:  # fmt: skip
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO / path, root / path)
     shutil.copytree(smoke_bundle, root / "bundles" / "2026-10-30-smoke")
@@ -274,14 +277,220 @@ def test_live_check_fails_on_missing_audio_or_a_guid_the_feed_lacks(repo, tmp_pa
 
     err = capsys.readouterr().err
     assert f"{base_url}/audio/ep-001-smoke.m4a: HTTP Error 404" in err
-    assert "Feed is missing ep-003-tides (guid not-deployed)" in err
+    assert "feed.xml is missing ep-003-tides (guid not-deployed)" in err
+
+
+def test_over_budget_the_oldest_episode_leaves_the_feed_but_not_the_archive(repo, tmp_path, capsys):
+    root, github = repo
+    set_site(root, budget_mb=size_mb(root, "ep-002-tides"))
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == ["Episode 2: How tides work"]
+    assert not (out / "audio" / "ep-001-smoke.m4a").exists()
+    assert "Episode 1: Why the sky is blue" in (out / "archive.html").read_text(encoding="utf-8")
+    assert "dropped ep-001-smoke" in capsys.readouterr().err
+
+
+def test_under_budget_every_episode_is_in_the_window_and_the_site_size_is_logged(
+    repo, tmp_path, capsys
+):
+    root, github = repo
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == ["Episode 2: How tides work", "Episode 1: Why the sky is blue"]
+    err = capsys.readouterr().err
+    assert "warning" not in err
+    assert re.search(r"site \d+\.\d MB", err)
+
+
+def test_a_site_over_the_firm_ceiling_is_refused(repo, tmp_path, capsys):
+    root, github = repo
+    set_site(root, ceiling_mb=0.01)
+
+    assert build_site(root, tmp_path / "_site", github) == 1
+
+    assert "over the 0.01 MB ceiling" in capsys.readouterr().err
+
+
+def test_a_pinned_episode_stays_in_the_window_and_counts_against_the_budget(repo, tmp_path):
+    root, github = repo
+    add_episode(root, github, "3", "ep-003-tides", "2026-11-05T09:00:00Z")
+    pin(root, "ep-001-smoke")
+    set_site(root, budget_mb=size_mb(root, "ep-001-smoke", "ep-003-tides"))
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == ["Episode 3: How tides work", "Episode 1: Why the sky is blue"]
+    assert (out / "audio" / "ep-001-smoke.m4a").exists()
+    assert not (out / "audio" / "ep-002-tides.m4a").exists()
+
+
+def test_a_pin_the_registry_does_not_have_is_warned_about(repo, tmp_path, capsys):
+    root, github = repo
+    pin(root, "ep-009-nothing")
+
+    assert build_site(root, tmp_path / "_site", github) == 0
+
+    assert "pinned ep-009-nothing is not in the registry" in capsys.readouterr().err
+
+
+def test_parts_stay_in_the_window_together_past_the_budget(repo, tmp_path):
+    root, github = repo
+    add_episode(root, github, "3a", "ep-003a-tides", "2026-11-05T09:00:00Z")
+    add_episode(root, github, "3b", "ep-003b-tides", "2026-11-05T09:00:01Z")
+    add_episode(root, github, "4", "ep-004-tides", "2026-11-08T09:00:00Z")
+    # Room for Episode 4 and Part 3a, so Part 3b runs past the budget.
+    set_site(root, budget_mb=size_mb(root, "ep-004-tides", "ep-003a-tides"))
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == [
+        "Episode 4: How tides work",
+        "Episode 3b: How tides work",
+        "Episode 3a: How tides work",
+    ]
+
+
+def test_a_pin_on_one_part_keeps_the_whole_topic(repo, tmp_path):
+    root, github = repo
+    episodes = registry(root)
+    episodes[0]["number"], episodes[1]["number"] = "1a", "1b"
+    write_registry(root, episodes)
+    add_episode(root, github, "2", "ep-002-sleep", "2026-11-05T09:00:00Z")
+    pin(root, "ep-001-smoke")
+    set_site(root, budget_mb=0.001)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == [
+        "Episode 2: How tides work",
+        "Episode 1b: How tides work",
+        "Episode 1a: Why the sky is blue",
+    ]
+
+
+def test_the_repoint_switch_is_off_by_default():
+    rules = yaml.safe_load((REPO / "config" / "site.yaml").read_text(encoding="utf-8"))
+
+    assert rules["repoint"] is False
+
+
+def test_with_repoint_on_an_episode_out_of_the_window_points_at_its_release(repo, tmp_path):
+    root, github = repo
+    set_site(root, budget_mb=size_mb(root, "ep-002-tides"), repoint=True)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    tides, smoke = feed(out).find("channel").findall("item")
+    assert tides.find("enclosure").get("url") == f"{BASE_URL}/audio/ep-002-tides.m4a"
+    assert smoke.find("enclosure").get("url") == (
+        "https://github.com/example/podcast/releases/download/ep-001-smoke/ep-001-smoke.m4a"
+    )
+    assert not (out / "audio" / "ep-001-smoke.m4a").exists()
+
+
+def test_the_test_feed_is_built_only_from_the_test_registry(repo, tmp_path):
+    root, github = repo
+    write_test_registry(root, [{**registry(root)[1], "guid": "test-guid-1"}])
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    channel = ET.parse(out / "test" / "feed.xml").getroot().find("channel")
+    assert channel.findtext("title") == "TEST Plainly Put"
+    assert channel.findtext("itunes:block", namespaces=NS) == "Yes"
+    (item,) = channel.findall("item")
+    assert item.findtext("title") == "TEST Episode 2: How tides work"
+    assert item.findtext("guid") == "test-guid-1"
+    assert item.find("enclosure").get("url") == f"{BASE_URL}/test/audio/ep-002-tides.m4a"
+    assert (out / "test" / "audio" / "ep-002-tides.m4a").exists()
+    assert "test-guid-1" not in (out / "feed.xml").read_text(encoding="utf-8")
+    assert "TEST" not in (out / "archive.html").read_text(encoding="utf-8")
+
+
+def test_a_test_episode_can_point_at_its_release_for_the_apple_test(repo, tmp_path):
+    root, github = repo
+    test = {**registry(root)[1], "guid": "test-guid-1", "enclosure": "release"}
+    write_test_registry(root, [test])
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    item = ET.parse(out / "test" / "feed.xml").getroot().find("channel/item")
+    assert item.find("enclosure").get("url") == (
+        "https://github.com/example/podcast/releases/download/ep-002-tides/ep-002-tides.m4a"
+    )
+    assert not (out / "test" / "audio").exists()
+
+
+def test_a_test_episode_under_a_real_guid_fails_the_build(repo, tmp_path, capsys):
+    root, github = repo
+    write_test_registry(root, [registry(root)[1]])
+
+    assert build_site(root, tmp_path / "_site", github) == 1
+
+    assert "reuses the guid 00000000-0000-4000-8000-000000000002" in capsys.readouterr().err
+
+
+def test_a_pinned_newest_episode_does_not_pull_in_the_next_one_over_budget(repo, tmp_path):
+    root, github = repo
+    pin(root, "ep-002-tides")
+    set_site(root, budget_mb=0.001)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == ["Episode 2: How tides work"]
+
+
+def test_with_no_test_episodes_there_is_no_test_feed(repo, tmp_path):
+    root, github = repo
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert not (out / "test").exists()
+
+
+def test_live_check_reads_the_test_feed_too(repo, tmp_path, capsys):
+    root, github = repo
+    write_test_registry(root, [{**registry(root)[1], "guid": "test-guid-1"}])
+    out = tmp_path / "_site"
+    with serve(out) as base_url:
+        assert build_site(root, out, github, base_url) == 0
+        assert check_site(root, base_url) == 0
+        write_test_registry(root, [{**registry(root)[1], "guid": "test-guid-2"}])
+
+        assert check_site(root, base_url) == 1
+
+    assert "test/feed.xml is missing ep-002-tides (guid test-guid-2)" in capsys.readouterr().err
+
+
+def test_live_check_expects_only_the_window_in_the_feed(repo, tmp_path):
+    root, github = repo
+    set_site(root, budget_mb=size_mb(root, "ep-002-tides"))
+    out = tmp_path / "_site"
+    with serve(out) as base_url:
+        assert build_site(root, out, github, base_url) == 0
+
+        assert check_site(root, base_url) == 0
 
 
 @pytest.fixture
 def bare_site(tmp_path, monkeypatch):
     """A deployed site with no Episodes, and a record of each wait between retries."""
     root = tmp_path / "repo"
-    root.mkdir()
+    (root / "config").mkdir(parents=True)
+    for path in ["config/site.yaml", "config/test_episodes.yaml"]:
+        shutil.copy(REPO / path, root / path)
     write_registry(root, [])
     out = tmp_path / "_site"
     out.mkdir()
@@ -338,6 +547,53 @@ def site_args(*argv):
 
 def feed(out):
     return ET.parse(out / "feed.xml").getroot()
+
+
+def titles(out):
+    return [item.findtext("title") for item in feed(out).find("channel").findall("item")]
+
+
+def set_site(root, **settings):
+    path = root / "config" / "site.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    config.update(settings)
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+
+def size_mb(root, *episode_ids):
+    """A budget these Episodes' audio just fills, a hair under their size so float rounding
+    can't leave room for one more."""
+    return sum(e["bytes"] for e in registry(root) if e["episode_id"] in episode_ids) / 1e6 - 1e-9
+
+
+def add_episode(root, github, number, episode_id, published_at):
+    """Publish one more Episode, with the tides Bundle and a 2-second tone, after the others."""
+    audio = tone_m4a(root.parent / "releases" / f"{episode_id}.m4a", 2)
+    github.add_published_release(episode_id, audio, published_at)
+    episodes = registry(root)
+    episodes.append(
+        {
+            "number": number,
+            "episode_id": episode_id,
+            "bundle_id": "2026-11-02-tides",
+            "guid": f"guid-{episode_id}",
+            "voice": "bm_george",
+            "file": audio.name,
+            "bytes": audio.stat().st_size,
+            "duration": 2,
+        }
+    )
+    write_registry(root, episodes)
+
+
+def pin(root, episode_id):
+    with (root / "pinned.txt").open("a", encoding="utf-8") as pins:
+        pins.write(f"{episode_id}\n")
+
+
+def write_test_registry(root, episodes):
+    text = yaml.safe_dump({"episodes": episodes}, sort_keys=False)
+    (root / "config" / "test_episodes.yaml").write_text(text, encoding="utf-8")
 
 
 def registry(root):

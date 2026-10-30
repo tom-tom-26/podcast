@@ -8,32 +8,38 @@ import xml.etree.ElementTree as ET
 from pipeline._lib.network import retry
 
 
-def live_problems(base: str, episodes: list[dict]) -> list[str]:
+def live_problems(base: str, feeds: dict[str, list[dict]]) -> list[str]:
     """What the live site gets wrong: Apple needs HEAD and range answers for the Cover and
-    every enclosure, and the Feed must carry exactly the registry's guids."""
+    every enclosure, and each Feed (by its path on the site) must carry exactly its Episodes'
+    guids."""
     problems = []
-    try:
-        feed = ET.fromstring(_get(f"{base}/feed.xml"))
-    except (OSError, ET.ParseError) as error:
-        return [f"{base}/feed.xml: {error}"]
-    enclosures = {}
-    for item in feed.iter("item"):
-        enclosure = item.find("enclosure")
-        if enclosure is None:
-            problems.append(f"Feed item {item.findtext('guid')} has no enclosure")
-        else:
-            enclosures[item.findtext("guid")] = enclosure.get("url")
-    expected = {episode["guid"]: episode for episode in episodes}
-    problems += [
-        f"Feed has guid {guid}, not in the registry" for guid in enclosures.keys() - expected.keys()
-    ]
-    problems += [
-        f"Feed is missing {expected[guid]['episode_id']} (guid {guid})"
-        for guid in expected.keys() - enclosures.keys()
-    ]
-
     urls = {f"{base}/cover.png": None, f"{base}/archive.html": None}
-    urls |= {url: expected[guid]["bytes"] for guid, url in enclosures.items() if guid in expected}
+    for path, episodes in feeds.items():
+        try:
+            feed = ET.fromstring(_get(f"{base}/{path}"))
+        except (OSError, ET.ParseError) as error:
+            problems.append(f"{base}/{path}: {error}")
+            continue
+        enclosures = {}
+        for item in feed.iter("item"):
+            enclosure = item.find("enclosure")
+            if enclosure is None:
+                problems.append(f"{path} item {item.findtext('guid')} has no enclosure")
+            else:
+                enclosures[item.findtext("guid")] = enclosure.get("url")
+        expected = {episode["guid"]: episode for episode in episodes}
+        problems += [
+            f"{path} has guid {guid}, not in its registry"
+            for guid in enclosures.keys() - expected.keys()
+        ]
+        problems += [
+            f"{path} is missing {expected[guid]['episode_id']} (guid {guid})"
+            for guid in expected.keys() - enclosures.keys()
+        ]
+        urls |= {
+            url: expected[guid]["bytes"] for guid, url in enclosures.items() if guid in expected
+        }
+
     for url, size in urls.items():
         try:
             length = _head(url)

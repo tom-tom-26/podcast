@@ -56,7 +56,13 @@
 
 **Episode registry**: The committed list of published Episodes: number, Episode id, Bundle id, guid, voice, file size and duration. The Pipeline is the only writer.
 
-**Window**: The Episodes whose audio the Pages site holds, newest first, within the size budget. The Feed lists only these; the Archive page lists every Episode.
+**Window**: The Episodes whose audio the Pages site holds, newest first, within the size budget. The Feed lists only these (unless the Repoint switch is on); the Archive page lists every Episode.
+
+**Site rules**: `config/site.yaml`: the Window's soft budget (about 600 MB of audio), the firm ceiling on the whole site (about 900 MB, over it the deploy is refused), and the Repoint switch.
+
+**Repoint switch**: The Site rules' `repoint` setting. Off, an Episode that leaves the Window leaves the Feed; on, it stays in the Feed with its enclosure on the stable Release download URL. Off until the real-device test shows Apple Podcasts follows that URL (ticket 08).
+
+**Test feed**: `test/feed.xml` on the Pages site, built from the hand-written test registry (`config/test_episodes.yaml`) with its own guids and titles starting `TEST`. For the real-device checks, never for listening. A test entry with `enclosure: release` points at its Release download URL.
 
 **Archive page**: The plain `noindex` page listing every published Episode, newest first, with a download link to its Release. The Feed's `link` points here and nothing else links to it.
 
