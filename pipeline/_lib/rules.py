@@ -112,7 +112,7 @@ def tts_problems(script: str, lexicon: Lexicon) -> list[str]:
             f"{where}: capitals {word!r}: not verified; add a Lexicon entry or say it another way"
             for word in lexicon.unverified_capitals(line)
         ]
-        line = lexicon.uncovered(line)
+        line = lexicon.without_terms(line)
         problems += [
             f"{where}: digit {m[0]!r}: write it as words" for m in re.finditer(r"\d+", line)
         ]
@@ -196,7 +196,7 @@ def style_warnings(segments: list[Segment], variant: str | None, lexicon: Lexico
                 warnings.append(f"{where}: {text.count(mark)} {name}s (aim for one a Segment)")
         warnings += [
             f"{where}: heteronym {m[0]!r}: check the reading"
-            for m in HETERONYMS.finditer(lexicon.uncovered(text))
+            for m in HETERONYMS.finditer(lexicon.without_terms(text))
         ]
         announcements += len(COUNT_ANNOUNCEMENT.findall(text))
     if announcements > COUNT_ANNOUNCEMENTS:

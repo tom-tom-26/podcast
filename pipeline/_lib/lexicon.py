@@ -14,7 +14,8 @@ CAPITALS = re.compile(r"(?<![\w-])[A-Z]{2,}s?(?![\w-])")
 # a term keep their context: phonemized on its own, a lone "a" at the cut reads as the letter.
 # It ends in a consonant because a vowel lets British linking r leak into the next word.
 STAND_IN = "jukebox"
-STAND_IN_PHONEMES = re.compile(r"dʒ[ˈˌ]?uːkbɒks(ɪz)?")  # ɪz: espeak's "jukebox's"
+# en-gb then en-us readings; the suffix is espeak's "jukebox's".
+STAND_IN_PHONEMES = re.compile(r"dʒ[ˈˌ]?uːkb(?:ɒ|ɑː)ks([ɪᵻ]z)?")
 
 
 class Lexicon:
@@ -28,14 +29,14 @@ class Lexicon:
             else None
         )
 
-    def uncovered(self, text: str) -> str:
+    def without_terms(self, text: str) -> str:
         """The text with every term blanked out, for rules that entries exempt."""
         return self.terms.sub(" ", text) if self.terms else text
 
     def unverified_capitals(self, text: str) -> list[str]:
         return [
             word
-            for word in CAPITALS.findall(self.uncovered(text))
+            for word in CAPITALS.findall(self.without_terms(text))
             if word not in self.verified and word.removesuffix("s") not in self.verified
         ]
 
@@ -49,35 +50,36 @@ class Lexicon:
         return self.terms.sub(lambda m: self.entries[m[0]].get(engine) or m[0], text)
 
     def kokoro_says(self, term: str, lang: str = "en-gb") -> str:
-        said = self.entries[term].get("kokoro")
-        if not said:
+        reading = self.entries[term].get("kokoro")
+        if not reading:
             return phonemize(term, lang)
-        return said.strip("/") if said.startswith("/") else phonemize(said, lang)
+        return reading.strip("/") if reading.startswith("/") else phonemize(reading, lang)
 
     def _kokoro(self, text: str, lang: str) -> Phonemes:
         if STAND_IN in text.lower():
             raise ValueError(f"the Lexicon's stand-in word {STAND_IN!r} is in the text")
-        says = [self.kokoro_says(m[0], lang) for m in self.terms.finditer(text)]
+        readings = [self.kokoro_says(m[0], lang) for m in self.terms.finditer(text)]
         phonemes = phonemize(self.terms.sub(STAND_IN, text), lang)
-        if len(STAND_IN_PHONEMES.findall(phonemes)) != len(says):
+        if len(STAND_IN_PHONEMES.findall(phonemes)) != len(readings):
             raise ValueError(
                 f"espeak changed the stand-in word, so a term went unspliced: {phonemes}"
             )
-        said = iter(says)
+        reading = iter(readings)
         return Phonemes(
             STAND_IN_PHONEMES.sub(
-                lambda m: _possessive(next(said)) if m[1] else next(said), phonemes
+                lambda m: _possessive(next(reading)) if m[1] else next(reading), phonemes
             )
         )
 
 
-def load_lexicon(repo: Path, pronunciations: list[dict] | None = None) -> Lexicon:
-    """The shared Lexicon, with a Bundle's own `pronunciations` winning for its Episode."""
+def load_lexicon(repo: Path, meta: dict | None) -> Lexicon:
+    """The shared Lexicon, with the Bundle's own `pronunciations` winning for its Episode."""
     lexicon = yaml.safe_load((repo / LEXICON).read_text(encoding="utf-8"))
-    return Lexicon(lexicon["verified"], lexicon["entries"] + (pronunciations or []))
+    pronunciations = (meta or {}).get("pronunciations") or []
+    return Lexicon(lexicon["verified"], lexicon["entries"] + pronunciations)
 
 
-def entry_problems(entries) -> list[str]:
+def entry_problems(entries: object) -> list[str]:
     if entries is None:
         return []
     if not isinstance(entries, list):

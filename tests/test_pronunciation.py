@@ -100,6 +100,7 @@ def render_cases(bundle, tmp_path, voice):
     roster = repo / "config" / "voices.yaml"
     voices = yaml.safe_load(roster.read_text(encoding="utf-8"))
     voices["voices"]["charles"] = {"engine": "pocket"}
+    voices["voices"]["am_adam"] = {"engine": "kokoro"}
     roster.write_text(yaml.safe_dump(voices), encoding="utf-8")
     meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
     meta["voice"] = voice
@@ -125,6 +126,23 @@ def test_kokoro_reads_a_stand_in_possessive(smoke_bundle, tmp_path):
     given = render_cases(smoke_bundle, tmp_path, "bm_george")
 
     assert "dˈʌbəljuː ˈeɪtʃ ˈəʊz ɐdvˈaɪs" in given
+
+
+def test_a_lone_a_beside_a_term_is_still_read_as_a_word(smoke_bundle, tmp_path):
+    with_line(smoke_bundle, "Then comes a Q and A.")
+
+    given = render_cases(smoke_bundle, tmp_path, "bm_george")
+
+    assert "ɐ kjˈuː ənd ˈeɪ" in given
+
+
+def test_an_american_kokoro_voice_is_given_the_entry_phonemes(smoke_bundle, tmp_path):
+    with_line(smoke_bundle, "The WHO's advice is short.")
+
+    given = render_cases(smoke_bundle, tmp_path, "am_adam")
+
+    assert "dˈʌbəljuː ˈeɪtʃ ˈəʊz" in given
+    assert "kjˈuː ənd ˈeɪ" in given
 
 
 def test_kokoro_gets_plain_text_where_no_term_is_said(smoke_bundle, tmp_path):
@@ -181,3 +199,13 @@ def test_pron_check_includes_the_bundles_own_entries(smoke_bundle):
 
     assert any(line.startswith("read it yesterday") for line in run.stdout.splitlines())
     assert "ɹˈɛd ɪt jˈɛstədˌeɪ" in run.stdout
+
+
+def test_pron_check_reports_a_broken_meta_instead_of_crashing(smoke_bundle):
+    (smoke_bundle / "meta.yaml").write_text("title: [Why\n", encoding="utf-8")
+
+    run = pron_check(smoke_bundle)
+
+    assert run.returncode == 1
+    assert "meta.yaml" in run.stdout
+    assert "Traceback" not in run.stderr

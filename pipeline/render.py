@@ -8,10 +8,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
-import yaml
 
 from pipeline._lib.bundle import load_meta
 from pipeline._lib.lexicon import load_lexicon
+from pipeline._lib.roster import load_roster
 from pipeline._lib.script import Pause, parse_script
 from pipeline._lib.synthesise import RATE, kokoro_lang, synthesise
 
@@ -45,11 +45,11 @@ def render_bundle(
     started = time.perf_counter()
     meta = load_meta(bundle)
     voice = meta["voice"]
-    roster = yaml.safe_load((repo / "config" / "voices.yaml").read_text(encoding="utf-8"))
-    if voice not in roster["voices"]:
+    roster = load_roster(repo)
+    if voice not in roster:
         raise RuntimeError(f"render {bundle.name}: voice {voice!r} is not in the voice roster")
-    engine = roster["voices"][voice]["engine"]
-    lexicon = load_lexicon(repo, meta.get("pronunciations"))
+    engine = roster[voice]["engine"]
+    lexicon = load_lexicon(repo, meta)
     segments = parse_script((bundle / "script.md").read_text(encoding="utf-8"))
     timeline: list[np.ndarray] = []
     chunks = 0

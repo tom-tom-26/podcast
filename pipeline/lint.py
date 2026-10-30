@@ -59,7 +59,7 @@ def main(args: argparse.Namespace) -> int:
     warnings = []
     # Later rules need the fields; a broken meta.yaml is already reported above.
     meta = load_meta(bundle) if not any(p.startswith("meta.yaml") for p in problems) else None
-    lexicon = load_lexicon(args.repo, meta and meta.get("pronunciations"))
+    lexicon = load_lexicon(args.repo, meta)
     texts = {
         file: (bundle / file).read_text(encoding="utf-8")
         for file in ("script.md", "ledger.md", "show_notes.md")
@@ -140,7 +140,12 @@ def main(args: argparse.Namespace) -> int:
 def pron_check(bundle: Path, repo: Path) -> int:
     # Phonemes are the point here, so print them, whatever the console's own encoding.
     sys.stdout.reconfigure(encoding="utf-8")
-    lexicon = load_lexicon(repo, load_meta(bundle).get("pronunciations"))
+    problems = [p for p in bundle_problems(bundle) if p.startswith("meta.yaml")]
+    if problems:
+        for problem in problems:
+            print(f"{bundle.name}: {problem}")
+        return 1
+    lexicon = load_lexicon(repo, load_meta(bundle))
     for term, entry in lexicon.entries.items():
         print(
             f"{term:22} kokoro: {lexicon.kokoro_says(term):30} "
