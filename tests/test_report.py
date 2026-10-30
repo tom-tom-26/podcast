@@ -130,6 +130,30 @@ def test_a_failed_deploy_with_no_bundle_says_so():
     assert "site check: 1 problems" in issue["body"]
 
 
+def test_the_log_lines_leave_out_the_echoed_step_and_colour_codes():
+    github = FakeGitHub()
+    log = (
+        '2026-11-02T18:00:01.0000000Z ##[group]Run if [[ ! "$BUNDLE_ID" =~ x ]]; then\n'
+        '2026-11-02T18:00:01.0000000Z \x1b[36;1mif [[ ! "$BUNDLE_ID" =~ x ]]; then\x1b[0m\n'
+        "2026-11-02T18:00:01.0000000Z \x1b[36;1m  exit 1\x1b[0m\n"
+        "2026-11-02T18:00:01.0000000Z shell: /usr/bin/bash -e {0}\n"
+        "2026-11-02T18:00:01.0000000Z env:\n"
+        "2026-11-02T18:00:01.0000000Z   BUNDLE_ID: not-a-bundle\n"
+        "2026-11-02T18:00:01.0000000Z ##[endgroup]\n"
+        "2026-11-02T18:00:01.1000000Z ##[error]Not a Bundle id: not-a-bundle\n"
+        "2026-11-02T18:00:01.2000000Z ##[error]Process completed with exit code 1.\n"
+    )
+    failed_publish_run(github, log=log)
+
+    run_report(github, "--bundle", "not-a-bundle")
+
+    body = github.issues[0]["body"]
+    assert 'Run if [[ ! "$BUNDLE_ID" =~ x ]]; then\n##[error]Not a Bundle id' in body
+    assert "\x1b" not in body
+    assert "shell: /usr/bin/bash" not in body
+    assert "BUNDLE_ID: not-a-bundle" not in body
+
+
 def run_report(github, *argv):
     parser = argparse.ArgumentParser()
     report.add_arguments(parser)

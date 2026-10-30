@@ -12,6 +12,7 @@ LABEL = "pipeline-failure"
 FAILED = ("failure", "cancelled")
 LOG_LINES = 30
 TIMESTAMP = re.compile(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ")
+ANSI = re.compile(r"\x1b\[[\d;]*m")
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -60,9 +61,19 @@ def main(args: argparse.Namespace, github=None) -> int:
 
 def _log_tail(log: str) -> str:
     """The lines up to the job's last error, without timestamps, so the post-job cleanup
-    that follows a failure doesn't push the cause out of view."""
-    lines = [TIMESTAMP.sub("", line) for line in log.splitlines()]
-    lines = [line for line in lines if line != "##[endgroup]"]
+    that follows a failure doesn't push the cause out of view. Each step's echo of its own
+    script and env is cut to its first line, which is enough to say which step it was."""
+    lines = []
+    in_group = False
+    for line in log.splitlines():
+        line = ANSI.sub("", TIMESTAMP.sub("", line))
+        if line.startswith("##[group]"):
+            lines.append(line.removeprefix("##[group]"))
+            in_group = True
+        elif line == "##[endgroup]":
+            in_group = False
+        elif not in_group:
+            lines.append(line)
     errors = [i for i, line in enumerate(lines) if line.startswith("##[error]")]
     if errors:
         lines = lines[: errors[-1] + 1]
