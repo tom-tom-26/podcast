@@ -2,7 +2,7 @@
 
 An optional one-tap way in: tap a Home-screen icon or say "Hey Siri, new episode", type a Topic, and a cloud session opens in the Claude app with the confirm message waiting. The Code tab stays the primary way in, and the steps in the README work if this breaks. The design is in `docs/wayfinder/research/13-skill-runtime-and-summon-surface.md` section 3.
 
-The Shortcut fires a scheduled task's API trigger. That feature is in research preview, and its endpoint sits behind a dated beta header that may change; when it does, update step 2 of the Shortcut.
+The Shortcut fires a scheduled task's API trigger (the API and the web page call scheduled tasks "routines"). The feature is in research preview: if the beta header changes, update step 2 of the Shortcut.
 
 ## 1. The scheduled task
 
@@ -23,7 +23,9 @@ At claude.ai/code/routines, after the README's one-time setup:
 
 5. Save it, then generate the API token. It is shown once. Copy it and the task's fire URL (`https://api.anthropic.com/v1/claude_code/routines/<id>/fire`) into the Shortcut below.
 
-The token can only fire this one task, and the prompt above lets the payload be nothing but a Topic, so someone holding the token can at most start a session that waits for a "go" only the owner can send. If the token leaks, regenerate it on the same page and paste the new one into the Shortcut.
+The token can only fire this one task. The platform marks the payload as untrusted data, and the prompt lets it be nothing but a Topic, so someone holding the token should get no further than a session waiting for a "go" only the owner can send. That rests on the model following the prompt, not on a hard limit, and each fire (up to 30 an hour) still spends plan usage. If the token leaks, regenerate it on the same page and paste the new one into the Shortcut; the old one stops working.
+
+Because of that narrowing, Q&A, feedback, "add to backlog" and "bring back" summons go through the Code tab, not the Shortcut.
 
 ## 2. The Shortcut (on the iPhone)
 
