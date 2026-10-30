@@ -19,7 +19,7 @@ def test_entry_point_runs_from_the_command_line(entry_point):
 def test_unbuilt_entry_point_fails_rather_than_passing_silently():
     # A lint that exits 0 before it checks anything would wave a Bundle through.
     run = subprocess.run(
-        [sys.executable, "-m", "pipeline", "lint"],
+        [sys.executable, "-m", "pipeline", "site"],
         capture_output=True,
         text=True,
     )

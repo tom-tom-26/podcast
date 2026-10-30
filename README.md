@@ -16,4 +16,12 @@ pytest
 pipeline --help
 ```
 
-The entry points are placeholders for now and exit with "not built yet".
+The tests need `ffmpeg` and `ffprobe` on the path. To hear a Bundle locally, install the engine with `pip install -e ".[kokoro]"`, put the Kokoro int8 model and voices file in `models/` (the publish-episode workflow shows where they come from), then:
+
+```
+pipeline lint tests/fixtures/bundles/2026-10-30-smoke
+pipeline render tests/fixtures/bundles/2026-10-30-smoke --out out/smoke.wav
+pipeline publish tests/fixtures/bundles/2026-10-30-smoke --wav out/smoke.wav --dry-run --out-dir out
+```
+
+`site` and publishing without `--dry-run` are not built yet. On GitHub, run the publish-episode workflow with a Bundle id and `dry_run` to get the `.m4a` as a workflow artifact.

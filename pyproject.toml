@@ -7,9 +7,14 @@ name = "pipeline"
 version = "0.1.0"
 description = "Turns Plainly Put Bundles into published Episodes and an updated Feed."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2",
+    "pyyaml>=6",
+]
 
 [project.optional-dependencies]
+# One extra per TTS engine, so a workflow installs only the engine its voice needs.
+kokoro = ["kokoro-onnx==0.6.1"]
 dev = [
     "import-linter>=2.1",
     "pre-commit>=4",
@@ -42,3 +47,5 @@ name = "Only the pipeline package imports its private library"
 type = "forbidden"
 source_modules = ["tests"]
 forbidden_modules = ["pipeline._lib"]
+# Tests reach _lib through the entry points; only direct imports are forbidden.
+allow_indirect_imports = true
