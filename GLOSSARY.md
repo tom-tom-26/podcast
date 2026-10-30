@@ -56,6 +56,14 @@
 
 **Episode registry**: The committed list of published Episodes: number, Episode id, Bundle id, guid, voice, file size and duration. The Pipeline is the only writer.
 
+**Window**: The Episodes whose audio the Pages site holds, newest first, within the size budget. The Feed lists only these; the Archive page lists every Episode.
+
+**Archive page**: The plain `noindex` page listing every published Episode, newest first, with a download link to its Release. The Feed's `link` points here and nothing else links to it.
+
+**Show config**: `config/show.yaml`, the Feed's channel fields and description.
+
+**Voice roster**: `config/voices.yaml`, each voice's engine and settings, and the credit line a CC BY voice needs.
+
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).

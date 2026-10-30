@@ -1,0 +1,14 @@
+# The show config: the Feed's channel fields, decided in ticket 12. Nothing here names the owner.
+title: Plainly Put
+author: Plainly Put
+copyright: © 2026 Plainly Put
+language: en-GB
+category: Education
+explicit: false
+type: episodic
+artwork: artwork/cover.png
+description: >-
+  One topic per episode, anything from bridge engineering to sleep, explained plainly in
+  about twenty-five minutes. Claude researches and writes each episode from a handful of
+  sources, all listed in the show notes, and a synthetic voice reads it. Where the evidence
+  is thin, the episode says so.

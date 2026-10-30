@@ -1,0 +1,64 @@
+name: deploy-site
+
+# publish-episode dispatches this after a publish; the owner can also run it by hand.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Shared with publish-episode, so a deploy never reads the registry mid-publish. Only this
+    # job joins it, so the smoke check's wait doesn't hold up the next publish.
+    concurrency:
+      group: publish
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ffmpeg
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - run: pip install -e .
+      - id: pages
+        uses: actions/configure-pages@v6
+      # Fails before anything is uploaded if any audio can't be fetched or any check fails,
+      # so Pages keeps the last good site.
+      - run: pipeline site --base-url "${{ steps.pages.outputs.base_url }}" --out _site
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  smoke-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      # Pages serves with max-age=600 (research/04 section 6), so before then the old Feed
+      # may still answer.
+      - run: sleep 660
+      - run: pipeline site --base-url "${{ needs.deploy.outputs.page_url }}" --check

@@ -6,11 +6,14 @@ REPO = Path(__file__).parent.parent
 class FakeGitHub:
     """Stands in for the Pipeline's GitHub client: an in-memory repo and its Releases."""
 
+    repo = "example/podcast"
+
     def __init__(self, upload_loses_bytes=0):
         self.files = {"episodes.yaml": (REPO / "episodes.yaml").read_text(encoding="utf-8")}
         self.releases = {}
         self.commits = []
         self.calls = []
+        self.audio = {}  # (tag, file name) -> bytes, for Releases a test puts in place
         self.upload_loses_bytes = upload_loses_bytes
 
     def read_file(self, path):
@@ -41,3 +44,22 @@ class FakeGitHub:
     def publish_release(self, release_id):
         self.calls.append("publish_release")
         self.releases[release_id]["draft"] = False
+
+    def add_published_release(self, tag, audio, published_at):
+        """A Release as publish leaves it, with its audio, for site to fetch from."""
+        assets = {audio.name: audio.stat().st_size}
+        self.releases[tag] = {"draft": False, "assets": assets, "published_at": published_at}
+        self.audio[tag, audio.name] = audio.read_bytes()
+
+    def published_at(self, tag):
+        self.calls.append("published_at")
+        return self.releases[tag]["published_at"]
+
+    def download_url(self, tag, name):
+        return f"https://github.com/{self.repo}/releases/download/{tag}/{name}"
+
+    def download_asset(self, tag, name, dest):
+        self.calls.append("download_asset")
+        if (tag, name) not in self.audio:
+            raise RuntimeError(f"GET {self.download_url(tag, name)} failed: 404 Not Found")
+        dest.write_bytes(self.audio[tag, name])

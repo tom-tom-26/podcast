@@ -25,4 +25,4 @@ pipeline render tests/fixtures/bundles/2026-10-30-smoke --out out/smoke.wav
 pipeline publish tests/fixtures/bundles/2026-10-30-smoke --wav out/smoke.wav --dry-run --out-dir out
 ```
 
-`site` is not built yet. On GitHub, run the publish-episode workflow with a Bundle id: with `dry_run` you get the `.m4a` as a workflow artifact; without it the Episode goes up as a Release and is added to `episodes.yaml`, the Episode registry.
+On GitHub, run the publish-episode workflow with a Bundle id: with `dry_run` you get the `.m4a` as a workflow artifact; without it the Episode goes up as a Release, is added to `episodes.yaml` (the Episode registry), and the deploy-site workflow rebuilds the Pages site from the registry, `config/show.yaml` and the Releases. Run deploy-site by hand to redeploy. If any audio can't be fetched or a check fails, nothing is deployed and the last good site stays up.

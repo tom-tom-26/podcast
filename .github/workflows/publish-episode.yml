@@ -11,9 +11,10 @@ on:
         type: boolean
         default: true
 
-# A real publish makes a Release and commits the Episode registry.
+# A real publish makes a Release, commits the Episode registry and dispatches deploy-site.
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: publish
@@ -88,3 +89,8 @@ jobs:
           name: ${{ inputs.bundle }}
           path: artifact/*.m4a
           if-no-files-found: error
+      # The deploy queues behind this run, since both share the publish concurrency group.
+      - if: ${{ !inputs.dry_run }}
+        run: gh workflow run deploy-site.yml --ref "$GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}

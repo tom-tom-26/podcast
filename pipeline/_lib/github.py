@@ -4,6 +4,7 @@ import base64
 import json
 import mimetypes
 import os
+import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -73,6 +74,23 @@ class GitHub:
 
     def publish_release(self, release_id: int) -> None:
         self._request("PATCH", f"{API}/repos/{self.repo}/releases/{release_id}", {"draft": False})
+
+    def published_at(self, tag: str) -> str:
+        release = self._request("GET", f"{API}/repos/{self.repo}/releases/tags/{tag}")
+        return release["published_at"]
+
+    def download_url(self, tag: str, name: str) -> str:
+        """The stable public URL of a Release asset, which redirects to a short-lived one."""
+        return f"https://github.com/{self.repo}/releases/download/{tag}/{name}"
+
+    def download_asset(self, tag: str, name: str, dest: Path) -> None:
+        # No token: the public URL needs none, and it must not follow the redirect to storage.
+        url = self.download_url(tag, name)
+        try:
+            with urllib.request.urlopen(url, timeout=300) as response, dest.open("wb") as out:
+                shutil.copyfileobj(response, out)
+        except OSError as error:
+            raise RuntimeError(f"GET {url} failed: {error}") from None
 
     def _request(self, method, url, body=None, content_type="application/json"):
         if body is not None and content_type == "application/json":

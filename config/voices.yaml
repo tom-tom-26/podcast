@@ -1,0 +1,5 @@
+# The voice roster. A voice with a credit gets that line appended to its Episodes' show notes.
+# The Pocket TTS voices ticket adds the other voices, engines and speeds.
+voices:
+  bm_george:
+    engine: kokoro
