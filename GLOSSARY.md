@@ -38,7 +38,7 @@
 
 **Hook**: The opening of an Episode (first ~45 s) that earns attention and states the promise.
 
-**Recall prompt**: A segment's main question, asked at its start with an invitation to guess, and re-asked with its answer at the end.
+**Recall prompt**: A segment's main question, asked at its start, with or without an invitation to guess, and re-asked with its answer at the end (research/05 12.11).
 
 **Part**: One of 2-3 Episodes made from a topic that would run over ~35 minutes and splits into standalone subtopics. Each Part stands alone; none ends on a cliffhanger.
 

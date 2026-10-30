@@ -66,7 +66,7 @@ The only non-spoken text in `script.md`:
 | `## <title>` on its own line | Segment boundary (headings in `template.md`) |
 | A blank line | Paragraph break, and a pause |
 | `[beat]` | A short deliberate pause, before a key number or a dry line. At most twice a Segment. |
-| `[think]` | Thinking time after a recall question |
+| `[think]` | Thinking time after a Recall prompt's question |
 | `{c7}` or `{c3,c7}` | Claim tag after the sentence it supports; not spoken |
 
 There is no emphasis or mood markup. Kokoro can't stress a word on request, so emphasis comes from wording (`template.md`, Sentences and lists).

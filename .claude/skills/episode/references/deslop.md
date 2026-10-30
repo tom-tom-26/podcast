@@ -15,7 +15,7 @@ The phrase list is `config/deslop_rules.yaml`, and `pipeline lint` runs it over 
 | F5 | No fillers, laughter or stage directions in spoken text. | lint blocks |
 | F6 | Speed and pause bounds in the render. | the Pipeline |
 | F7 | Any breath or audio sample has a recorded licence. | the Pipeline (breaths are off) |
-| F8 | No claim of a check that wasn't run, in a commit message, the PR or the final message. | you |
+| F8 | No claim of a check that wasn't run, in commit messages, logs, docs, the PR or the final message. | you |
 | F9 | The core ten never appear: "let's dive in", "dive deep", "delve", "in today's episode", "welcome back", "without further ado", "buckle up", "great question", "it's important to note", "it's worth noting". | lint blocks |
 
 ## The tells to look for
@@ -52,7 +52,7 @@ About ±25% on every number.
 4. No more than about 4 "X, Y and Z" triples per 1,000 words; "three things" announced at most twice.
 5. No paragraph opener used for more than about 15% of paragraphs, and never twice in a row.
 6. "Not X. Y." at most once.
-7. No lead-in twice in an Episode, across recall prompts, listener questions and signposts.
+7. No lead-in twice in an Episode, across Recall prompts, listener questions and signposts.
 8. No six-word run shared with the last ten Bundles in the Hook, Roadmap, signposts, prompts, Sign-off, summary or show-notes opening. Lint warns on these.
 9. One or two asides an Episode, each its own sentence, each carrying a fact or a judgement.
 10. Zero to two light moments, from the material.

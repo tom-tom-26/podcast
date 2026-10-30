@@ -56,27 +56,28 @@ def ledger_ids(ledger: str) -> set[str]:
     return {line.split("|", 1)[0].strip() for line in ledger.splitlines() if "|" in line}
 
 
-LEDGER_FIELDS = 7
+LEDGER_FIELDS = ["id", "claim", "source", "tier", "read depth", "n and population", "tags"]
+TIERS = {"1", "2", "3", "4"}
 READ_DEPTHS = {"full text", "abstract", "secondary"}
 
 
 def ledger_warnings(ledger: str) -> list[str]:
-    """Ledger lines not in the shape `id | claim | source | tier | read depth | n and
-    population | tags`. The claim-check and the firm number rule both lean on tier and read
-    depth, so a line missing them is worth fixing, though only a broken Claim tag blocks."""
+    """Ledger lines not in the LEDGER_FIELDS shape. The claim-check and the firm number rule
+    both lean on tier and read depth, so a line missing them is worth fixing, though only a
+    broken Claim tag blocks."""
     warnings = []
     for line in ledger.splitlines():
         if "|" not in line:
             continue
         fields = [field.strip() for field in line.split("|")]
         where = f"ledger.md, {fields[0]}"
-        if len(fields) != LEDGER_FIELDS:
+        if len(fields) != len(LEDGER_FIELDS):
             warnings.append(
-                f"{where}: {len(fields)} fields, not 7 (id | claim | source | tier | "
-                "read depth | n and population | tags)"
+                f"{where}: {len(fields)} fields, not {len(LEDGER_FIELDS)} "
+                f"({' | '.join(LEDGER_FIELDS)})"
             )
             continue
-        if fields[3] not in {"1", "2", "3", "4"}:
+        if fields[3] not in TIERS:
             warnings.append(f"{where}: tier {fields[3]!r} is not 1 to 4")
         if fields[4] not in READ_DEPTHS:
             warnings.append(

@@ -60,7 +60,7 @@ Fix the Bundle id now: `<today's date>-<slug>`, the slug a few lower-case words 
 
 ## 3. Write
 
-Write the Script in spoken form, to `references/template.md`, `references/tts.md` and `references/deslop.md`. Then write `show_notes.md` (written form, exact numbers) and `meta.yaml` (fields in `references/template.md`).
+Write the Script in spoken form, to `references/template.md`, `references/tts.md` and `references/deslop.md`. Then write `show_notes.md` (written form, exact numbers), `meta.yaml` (fields in `references/template.md`), and `lint_report.yaml` holding just `warnings: []`. Lint blocks a Bundle without that file, and fills it in itself.
 
 Write as you go to the Bundle folder, so a lost session leaves the work on disk.
 
@@ -79,7 +79,7 @@ In this order, fixing as you go:
 pipeline lint bundles/<Bundle id>
 ```
 
-It must exit 0. A blocking line is a firm rule: fix the Script, never the rule. Every warning goes into `lint_report.yaml`; fix it, or keep it with a one-line `reason`. Lint keeps the reasons you gave when you run it again, so run it until it exits 0 and each kept warning has a reason.
+It must exit 0. A blocking line is a firm rule: fix the Script, never the rule. Every warning goes into `lint_report.yaml`; fix it, or keep it with a one-line `reason`. A warning on an F1, F2 or F3 phrase (`references/deslop.md`) is a firm rule lint can only warn on: keep it only when the sentence really meets the rule, such as "studies show" with the evidence named and a Claim tag, and say so in the reason. Lint keeps the reasons you gave when you run it again, so run it until it exits 0 and each kept warning has a reason.
 
 If you can't make a Bundle pass, don't push. Say what blocks in the final message.
 
@@ -104,6 +104,8 @@ Then open the PR. `gh pr create` fails in a cloud session, because the GitHub pr
 gh api repos/{owner}/{repo}/pulls -f head=claude/<slug> -f base=main -f title="<title>" -f body="<one or two plain sentences: the Topic and the Variant>"
 ```
 
+If the PR call fails, the branch is still pushed: say so at the top of the final message, with the branch name, so the owner can open the PR from the GitHub app. Without a PR nothing publishes.
+
 Auto-merge takes it from there: lint on the branch, a squash merge, publish-episode, deploy-site. Don't merge it yourself.
 
 ## 7. Final message
@@ -112,8 +114,9 @@ Plain text, short sections, readable on a phone:
 
 - **Bundle**: `bundles/<Bundle id>` on `claude/<slug>`, and the PR link.
 - **Kept warnings**: each one with its reason, or "none".
+- **Choices**: any call you made on an unclear reply, any Source profile you drafted, and any firm default (explain first, an analogy per hard concept) you broke, with the reason.
 - **Left out**: anything the research found but the Episode doesn't say, and why: too weak to voice, off the outline, a source behind a paywall, or something you would not write. When you wrote a safer version than the Topic asked for, say what you left out and why.
-- **Proposed additions**: shared Lexicon entries (each `{term, kokoro, pocket?, note}`) and phrase-list additions, for the owner to accept. Don't write them to `config/` yourself.
+- **Proposed additions**: shared Lexicon entries (each `{term, kokoro, pocket?, by: skill <date>, note}`) and phrase-list additions, for the owner to accept. Don't write them to `config/` yourself.
 - **ETA**: about 10-25 minutes of render after the merge, Pocket voices slower.
 
 Never give an Episode number: the Pipeline picks it at publish time.

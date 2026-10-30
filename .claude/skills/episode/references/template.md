@@ -40,13 +40,13 @@ Headings are fixed words so tooling can find them:
 **Content Segments.** Each one carries, in an order you vary between Segments:
 
 - a spoken preview of what it explains and why, said with "because" and "so", never a bare "Idea two";
-- its main question, near the start. Inviting a guess is optional; sometimes the question just hangs with a `[think]`;
+- its Recall prompt: the main question near the start, re-asked with its answer at the end. Inviting a guess is optional; sometimes the question just hangs with a `[think]`;
 - the mechanism or core idea, one idea per sentence, with one everyday analogy carried through (and where it breaks, if it does);
 - one sourced surprise, one concrete case, and one view the host commits to (research/18);
 - the evidence phrase at the load-bearing claim (`accuracy.md`);
 - at most one simulated listener question;
 - one "so what" sentence per mechanism, in fresh words;
-- the main question re-asked with its answer at the end, which may fold into the "so what";
+- the re-asked question may fold into the "so what";
 - from Segment 2 on, a brief spaced-recall question about an earlier Segment.
 
 Open one Segment with the case, another with the question, another with the surprising number. Don't give two Segments the same internal order. If research finds nothing surprising for a Segment, merge it or cut it.

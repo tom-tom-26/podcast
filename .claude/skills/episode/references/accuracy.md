@@ -7,7 +7,7 @@ From ticket 06 with recommendations 1-5 signed off, research/05 sections 2.5, 2.
 Each field of topics has a Source profile: what counts as strong evidence, what to watch for, and what triggers the Higher-risk flag. Use the matching field file in `learnings/fields/` when it exists; otherwise use the table in `docs/wayfinder/research/05-episode-template-and-style-guide.md` section 13.
 
 - **Overlap rule:** a Topic can draw on two profiles (sport training uses Sport and Health). The stricter flag rule applies.
-- **No profile fits:** draft one with the same three columns during research, borrowing the risk triggers of the strictest neighbouring profile, and use it. Mention the draft in the final message.
+- **No profile fits:** draft one with the same three columns during research, borrowing the risk triggers of the strictest neighbouring profile, and use it. Mention the draft in the final message; saving it to Learnings comes with Learnings.
 
 ## The ladder
 
@@ -47,7 +47,7 @@ A source behind a paywall or a bot wall is read as far as you can: its abstract,
 
 ## The Claim ledger
 
-`ledger.md`, one line per claim, written while researching. Seven fields, separated by ` | `:
+`ledger.md`, one line per claim, written while researching, with no header line. Seven fields, separated by ` | `:
 
 ```
 id | claim | source | tier | read depth | n and population | tags
@@ -88,7 +88,7 @@ These run in step 4, before lint.
   curl -s "https://api.crossref.org/works?filter=updates:<DOI>&rows=20" | jq '[.message.items[] | .["update-to"][]? | {type, DOI: .DOI}]'
   ```
 
-  Crossref lists the notices that update a DOI, and carries the Retraction Watch data. A `retraction`, `withdrawal` or `expression_of_concern` against the study's DOI means it comes out, or is voiced as contested if it's an expression of concern. For a PubMed record, its publication types also say "Retracted Publication". Tag the line `retraction_checked`.
+  Crossref lists the notices that update a DOI, and carries the Retraction Watch data. A `retraction` or `withdrawal` against the study's DOI means it comes out. Report an `expression_of_concern` in the final message. For a PubMed record, its publication types also say "Retracted Publication". Tag the line `retraction_checked`.
 
 ## Voicing the evidence
 
