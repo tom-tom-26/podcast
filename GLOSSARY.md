@@ -102,6 +102,12 @@
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).
 
+**Instruction and reaction**: The two kinds of taste feedback. An instruction ("make them shorter") changes a Template tunable, the Voice roster or an agreed default at once. A reaction ("7 felt long") is logged in the Listener profile, and a change is only proposed after about 3 similar ones (ticket 16).
+
+**Episode family**: An Episode, its sibling Parts and the Q&As on any of them. One Correction checks the whole family's ledgers for the same claim.
+
+**Overlap check**: In an Episode run, comparing the new Claim ledger with the ledgers of older Episodes on the same Topic, so a contradiction is flagged for a Correction rather than left in the archive (ticket 16).
+
 **Revision**: A Bundle's version number in `meta.yaml`, 1 when the Skill writes it. A Correction that needs a Re-render raises it by one; it never goes down.
 
 **Re-render**: Publishing a published Episode again from its corrected Bundle, as `-v2.m4a` (then `-v3`) in the same Release. The old file stays, the guid and Episode number never change, and the Episode registry entry moves to the new file. Auto-merge starts one when a published Bundle's `revision` rises.

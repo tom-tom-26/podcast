@@ -11,7 +11,9 @@ def archive_html(show: dict, items: list[dict]) -> str:
         rows.append(
             f'<li><a href="{html.escape(item["download_url"])}">{html.escape(item["title"])}</a>'
             f"<br>{published.day} {published:%B %Y}, {minutes} min"
-            f"<br>{html.escape(item['summary'])}</li>"
+            f"<br>{html.escape(item['summary'])}"
+            + "".join(f"<br>{html.escape(line.strip())}" for line in item["corrections"])
+            + "</li>"
         )
     return "\n".join(
         [

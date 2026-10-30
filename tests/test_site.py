@@ -429,6 +429,25 @@ def test_a_re_render_outside_the_window_changes_the_archive_but_not_the_feed(rep
     assert "releases/download/ep-001-smoke/ep-001-smoke-v2.m4a" in page
 
 
+def test_the_archive_page_carries_a_corrected_episodes_dated_line(repo, tmp_path):
+    root, github = repo
+    notes = root / "bundles" / "2026-10-30-smoke" / "show_notes.md"
+    line = (
+        "Corrected 2026-11-03: an earlier version said violet light scatters least. "
+        "That was wrong; it scatters most (Encyclopaedia Britannica)."
+    )
+    notes.write_text(f"{line}\n\n" + notes.read_text(encoding="utf-8"), encoding="utf-8")
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    page = (out / "archive.html").read_text(encoding="utf-8")
+    smoke = page[page.index("Episode 1: Why the sky is blue") :]
+    assert f"<br>{line}</li>" in smoke
+    tides = page[page.index("Episode 2: How tides work") : page.index("Episode 1")]
+    assert "Corrected" not in tides
+
+
 def test_a_pinned_re_render_outside_the_budget_reaches_the_feed(repo, tmp_path):
     root, github = repo
     set_site(root, budget_mb=size_mb(root, "ep-002-tides"))

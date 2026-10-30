@@ -353,6 +353,21 @@ def test_phrase_list_comes_from_config(qa_bundle):
     assert "scatter" in run.stdout
 
 
+def test_variant_ceilings_come_from_the_template_tunables(qa_bundle):
+    repo = qa_bundle.parent.parent
+    smoke = repo / "bundles" / "2026-10-30-smoke"
+    tunables = repo / "config" / "template.yaml"
+    config = yaml.safe_load(tunables.read_text(encoding="utf-8"))
+    assert "minutes" not in lint(smoke, repo=repo).stdout
+    config["variants"]["Quick"]["max_minutes"] = 0.5
+    tunables.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    run = lint(smoke, repo=repo)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "over the Quick ceiling of 0.5" in run.stdout
+
+
 QA_SCRIPT = """## Hook
 
 Episode one said blue light scatters most. {p:c2} So why isn't the sky violet?
@@ -523,6 +538,68 @@ def test_correction_lines_are_accepted(tmp_path):
     assert run.returncode == 0, run.stdout + run.stderr
     assert "2026-10-01-older" not in run.stdout
     assert "Corrected" not in run.stdout
+
+
+CORRECTION = (
+    "- date: 2026-11-03\n  tier: Minor\n  claim: c3\n  fix: eyes, not air\n  source: Britannica"
+)
+
+
+@pytest.mark.parametrize(
+    "corrections",
+    [
+        "corrections: {date: 2026-11-03}",
+        "corrections:\n" + CORRECTION.replace("Minor", "Severe"),
+        "corrections:\n" + CORRECTION.replace("2026-11-03", "last week"),
+        "corrections:\n" + CORRECTION.replace("  fix: eyes, not air\n", ""),
+        "corrections:\n" + CORRECTION.replace("Britannica", "''"),
+    ],
+)
+def test_a_malformed_correction_blocks(smoke_bundle, corrections):
+    break_meta(smoke_bundle, "corrections: []", corrections)
+
+    run = lint(smoke_bundle)
+
+    assert run.returncode == 1
+    assert "meta.yaml: corrections" in run.stdout
+
+
+def test_a_minor_correction_with_its_show_notes_line_passes(smoke_bundle):
+    break_meta(smoke_bundle, "corrections: []", "corrections:\n" + CORRECTION)
+    edit(
+        smoke_bundle,
+        "show_notes.md",
+        "Why is the sky",
+        "Corrected 2026-11-03: an earlier version said air alone. That was wrong; it's "
+        "eyes, not air (Britannica).\n\nWhy is the sky",
+    )
+
+    run = lint(smoke_bundle)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "corrections" not in run.stdout
+    assert "Corrected" not in run.stdout
+
+
+def test_a_correction_without_its_show_notes_line_only_warns(smoke_bundle):
+    break_meta(smoke_bundle, "corrections: []", "corrections:\n" + CORRECTION)
+
+    run = lint(smoke_bundle)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "no 'Corrected 2026-11-03:' line" in run.stdout
+
+
+def test_a_harmful_correction_without_the_spoken_line_only_warns(smoke_bundle):
+    break_meta(
+        smoke_bundle, "corrections: []", "corrections:\n" + CORRECTION.replace("Minor", "Harmful")
+    )
+    edit(smoke_bundle, "show_notes.md", "Why is the sky", CORRECTION_NOTE + "Why is the sky")
+
+    run = lint(smoke_bundle)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "spoken correction line" in run.stdout
 
 
 def report(bundle):

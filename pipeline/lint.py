@@ -12,6 +12,7 @@ from pipeline._lib.bundle import bundle_problems, load_meta
 from pipeline._lib.lexicon import load_lexicon, phonemize
 from pipeline._lib.rules import (
     claim_problems,
+    correction_warnings,
     ledger_ids,
     ledger_warnings,
     pace_warnings,
@@ -36,7 +37,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--repo",
         type=Path,
         default=Path("."),
-        help="the repo checkout, for the phrase list, the Lexicon and the Episode registry",
+        help="the repo checkout, for the phrase list, the Template tunables, the Lexicon and "
+        "the Episode registry",
     )
     parser.add_argument(
         "--pron-check",
@@ -56,6 +58,9 @@ def main(args: argparse.Namespace) -> int:
     phrase_list = yaml.safe_load(
         (args.repo / "config" / "deslop_rules.yaml").read_text(encoding="utf-8")
     )
+    variants = yaml.safe_load((args.repo / "config" / "template.yaml").read_text(encoding="utf-8"))[
+        "variants"
+    ]
     problems = bundle_problems(bundle)
     warnings = []
     # Later rules need the fields; a broken meta.yaml is already reported above.
@@ -70,6 +75,7 @@ def main(args: argparse.Namespace) -> int:
     # Firm rules report a line number to fix; warnings name the Segment, so a reason kept in
     # lint_report.yaml still matches after the lines above it move.
     blockable, warnable = [], []
+    segments = None
     if "script.md" in texts:
         script = texts["script.md"]
         problems += tts_problems(script, lexicon)
@@ -95,7 +101,7 @@ def main(args: argparse.Namespace) -> int:
             questions = qa if isinstance(qa, list) else None
             warnings += style_warnings(segments, meta and meta["variant"], lexicon, questions)
             if meta:
-                warnings += pace_warnings(segments, meta)
+                warnings += pace_warnings(segments, meta, variants[meta["variant"]]["max_minutes"])
     if meta:
         listing = [(f"meta.yaml {key}", meta[key]) for key in ("title", "summary")]
         blockable += listing
@@ -119,6 +125,9 @@ def main(args: argparse.Namespace) -> int:
         )
     ]
 
+    # Only a schema-valid list is read; a broken one already blocks.
+    if meta and not any(p.startswith("meta.yaml: corrections") for p in problems):
+        warnings += correction_warnings(segments, meta, texts.get("show_notes.md", ""))
     warnings += shared_run_warnings(bundle)
     if not any(p.startswith("lint_report.yaml") for p in problems):
         write_report(bundle / "lint_report.yaml", warnings)

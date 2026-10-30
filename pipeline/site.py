@@ -19,6 +19,7 @@ from pipeline._lib.github import GitHub
 from pipeline._lib.live import live_problems
 from pipeline._lib.registry import REGISTRY, load_registry
 from pipeline._lib.roster import load_roster, with_credit
+from pipeline._lib.rules import CORRECTION_NOTE
 from pipeline._lib.window import MB, PIN_LIST, choose_window, load_pins
 
 COVER_SIZE = 3000
@@ -108,13 +109,14 @@ def main(args: argparse.Namespace, github=None) -> int:
     def item(episode, url, title_prefix=""):
         bundle = args.repo / "bundles" / episode["bundle_id"]
         meta = load_meta(bundle)
-        notes = with_credit(
-            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, episode["voice"]
-        )
+        written = (bundle / "show_notes.md").read_text(encoding="utf-8")
+        notes = with_credit(written, roster, episode["voice"])
         return {
             "title": f"{title_prefix}Episode {episode['number']}: {meta['title']}",
             "summary": meta["summary"],
             "notes": notes,
+            # Outside the Window the Archive page is the only place a correction shows.
+            "corrections": CORRECTION_NOTE.findall(written),
             "guid": episode["guid"],
             "url": url,
             "bytes": episode["bytes"],

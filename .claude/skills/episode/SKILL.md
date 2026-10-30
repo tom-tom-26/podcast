@@ -1,6 +1,6 @@
 ---
 name: episode
-description: Make a Plainly Put Episode. Use when the owner names a Topic to make an Episode about ("caffeine and sleep", "how tides work, deep"), or asks questions about a published Episode for a Q&A ("7: does decaf count?"). Researches the Topic, writes the Script, Claim ledger and show notes as a Bundle, lints it and pushes it on a claude/ branch for the Pipeline to publish.
+description: Make a Plainly Put Episode. Use when the owner names a Topic to make an Episode about ("caffeine and sleep", "how tides work, deep"), asks questions about a published Episode for a Q&A ("7: does decaf count?"), or gives feedback on one ("feedback 7: too long"), including a wrong fact to correct. Researches the Topic, writes the Script, Claim ledger and show notes as a Bundle, lints it and pushes it on a claude/ branch for the Pipeline to publish.
 ---
 
 # Episode
@@ -9,7 +9,7 @@ The owner names a Topic from their phone. This Skill turns it into a Bundle on a
 
 The owner spends about a minute on an Episode: the Topic, then one reply to the confirm message. Never ask them anything else. When something is unclear after their reply, make the most reasonable call and say what you chose in the final message.
 
-Two modes are built. **Episode mode** is the steps below. **Q&A mode** is for a summon that names a published Episode, by number or title words, plus one or more questions ("7: does decaf count?"): read `references/qa.md` before step 1 and follow it wherever it differs from the steps below. If the owner gives feedback (`feedback 7: ...`), says "next", "add to backlog: X" or "bring back episode X", say that mode isn't built yet and stop. Never suggest Topics.
+Three modes are built. **Episode mode** is the steps below. **Q&A mode** is for a summon that names a published Episode, by number or title words, plus one or more questions ("7: does decaf count?"): read `references/qa.md` before step 1 and follow it wherever it differs from the steps below. **Feedback mode** is for reactions, instructions and Corrections ("feedback 7: too long, and it said 'Kokoro' wrong"), alone or dropped into another summon: read `references/feedback.md` and follow it. It has no Topic: it runs "Before step 1", then its own steps, using step 5's lint and step 6's push from here. If the owner says "next", "add to backlog: X" or "bring back episode X", say that mode isn't built yet and stop. Never suggest Topics.
 
 ## References
 
@@ -23,13 +23,14 @@ Read each one when its step comes up, not all at the start.
 | `references/deslop.md` | Firm rules F1-F9, the soft checklist, the ten-question self-review | step 3, again at step 4 |
 | `references/learnings.md` | What a lesson is, the line format, Source profile rules, compaction, push conflicts, "Learned this run" | before step 1, again at step 6 |
 | `references/qa.md` | Q&A mode: finding the parent, the confirm, research, the Q&A shape, the Listener profile | before step 1, in Q&A mode only |
+| `references/feedback.md` | Feedback mode: sorting remarks, instructions and reactions, Corrections, the Owner-instructed commit | in Feedback mode, or when feedback comes with another summon; at step 2 for the overlap check |
 
 ## Before step 1
 
 1. `pip install -e .` from the repo root, so `pipeline lint` runs.
 2. `git fetch origin main` and work from `origin/main`.
 3. Read `learnings/INDEX.md`, `learnings/general.md` and the one or two field files the index matches to the Topic (`references/learnings.md`), and follow the lessons that apply. Read `config/listener_profile.md`. The Listener profile shapes depth and angle; it never overrides the owner's words in this summon.
-4. Read `config/voices.yaml` for the roster and each voice's `suits:` hints.
+4. Read `config/voices.yaml` for the roster and each voice's `suits:` hints, and `config/template.yaml` for the Template tunables: the Variant ranges and the wpm budget.
 
 ## 1. Confirm
 
@@ -57,6 +58,7 @@ Follow `references/accuracy.md`. In short:
 - Write `ledger.md` as you go, one line per claim. Don't write the Script first and source it afterwards.
 - Every number that carries weight is read from raw text (`curl`, `pdftotext`, PubMed's abstract text), never from a WebFetch summary or a search snippet.
 - Decide the Higher-risk flag here, from the profile's triggers. When unsure, flag.
+- **Overlap check:** when `episodes.yaml` holds an older Episode on the same Topic (its title or ledger covers the same ground), read its `ledger.md` and compare it with yours. Where the two disagree on a claim, find out which is right. If the old one is wrong, say so at the top of the final message with a proposed grade (`references/feedback.md`). Correcting it is a Feedback-mode Correction with `source: skill`, on a branch of its own, run only if the owner asks.
 
 Fix the Bundle id now: `<today's date>-<slug>`, the slug a few lower-case words joined by hyphens. Write into `bundles/<Bundle id>/`. For Parts, one Bundle per Part, each with `part: {n, of, series_slug}` and the same `series_slug`.
 
@@ -121,7 +123,8 @@ Plain text, short sections, readable on a phone:
 - **Choices**: any call you made on an unclear reply, any Source profile you drafted, and any firm default (explain first, an analogy per hard concept) you broke, with the reason.
 - **Left out**: anything the research found but the Episode doesn't say, and why: too weak to voice, off the outline, a source behind a paywall, or something you would not write. When you wrote a safer version than the Topic asked for, say what you left out and why.
 - **Learned this run**: the block in `references/learnings.md`, or "nothing new". Proposed Source profile changes go here too.
-- **Proposed additions**: shared Lexicon entries (each `{term, kokoro, pocket?, by: skill <date>, note}`) and phrase-list additions, for the owner to accept. Don't write them to `config/` yourself.
+- **Proposed additions**: shared Lexicon entries (each `{term, kokoro, pocket?, by: skill <date>, note}`) and phrase-list additions, for the owner to accept. Don't write them to `config/` yourself; only Feedback mode writes there, and only what the owner gave.
 - **ETA**: about 10-25 minutes of render after the merge, Pocket voices slower.
+- **Feedback**, only after something changed: a voice not heard in any earlier Episode, a `style_guide_version` higher than the last published Episode's, or the first Episode of its Variant (check the Bundles listed in `episodes.yaml`). Ask one line about that change: "First Deep Episode: once you've heard it, a line on how the length felt would help." Otherwise never ask.
 
 Never give an Episode number: the Pipeline picks it at publish time.

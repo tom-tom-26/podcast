@@ -4,7 +4,7 @@ The owner's taste, as shown by their Q&A questions and their feedback: how much 
 
 Keep it to about 300-500 tokens. When it grows past that, merge the oldest observations into one line under Summary, keeping their Episode references.
 
-An observation is one line: `- <date> · Q&A on <parent number> · <Bundle id>: <what it shows>`. A default change goes under Agreed defaults only with the owner's OK.
+An observation is one line: `- <date> · Q&A on <parent number> · <Bundle id>: <what it shows>`, or `- <date> · feedback on <number>: <what it shows>` (`feedback on the show` when no Episode is named). A default change goes under Agreed defaults only with the owner's OK, or as the owner's own instruction in Feedback mode.
 
 ## Agreed defaults
 

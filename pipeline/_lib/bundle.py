@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -10,6 +11,7 @@ BUNDLE_FILES = ["script.md", "meta.yaml", "show_notes.md", "ledger.md", "lint_re
 SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 BUNDLE_ID = re.compile(rf"\d{{4}}-\d{{2}}-\d{{2}}-{SLUG.pattern}")
 VARIANTS = {"Quick", "Standard", "Deep"}
+TIERS = {"Harmful", "Material", "Minor"}
 
 
 def bundle_problems(bundle: Path) -> list[str]:
@@ -62,6 +64,7 @@ def _meta_problems(path: Path) -> list[str]:
     revision = meta.get("revision")
     if not _whole_number(revision):
         problems.append("revision must be a whole number from 1")
+    problems += _correction_problems(meta)
     return problems
 
 
@@ -98,6 +101,31 @@ def _question_problems(meta: dict) -> list[str]:
     ):
         return ["questions: a Q&A needs the owner's questions, word for word, as a list of text"]
     return []
+
+
+def _correction_problems(meta: dict) -> list[str]:
+    corrections = meta.get("corrections")
+    if corrections in (None, []):
+        return []
+    if not isinstance(corrections, list):
+        return ["corrections must be a list"]
+    problems = []
+    for n, correction in enumerate(corrections, 1):
+        # The show-notes line quotes the date, and the owner reads claim, fix and source.
+        if (
+            not isinstance(correction, dict)
+            or not isinstance(correction.get("date"), date)
+            or correction.get("tier") not in TIERS
+            or not all(
+                isinstance(correction.get(key), str) and correction[key].strip()
+                for key in ("claim", "fix", "source")
+            )
+        ):
+            problems.append(
+                f"corrections: entry {n} needs a date (YYYY-MM-DD), a tier of "
+                f"{', '.join(sorted(TIERS))}, and claim, fix and source as text"
+            )
+    return problems
 
 
 def _whole_number(value) -> bool:

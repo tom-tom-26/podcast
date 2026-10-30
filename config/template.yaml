@@ -1,0 +1,34 @@
+# The Template tunables: the Episode template's numbers the owner can change by instruction
+# in Feedback mode. Every number is soft, about ±25%. The prose rules around them live in
+# .claude/skills/episode/references/template.md.
+#
+# Raise style_guide_version by one whenever a number here changes.
+style_guide_version: 1
+
+# Spoken words a minute the Script is written to; re-calibrated to the voice after two Episodes.
+wpm_budget: 165
+
+# Minutes. max_minutes is a ceiling, never a target: there is no minimum and no padding.
+variants:
+  Quick:
+    min_minutes: 8
+    typical_minutes: 11
+    max_minutes: 15
+    content_segments: [2, 3]
+    listener_questions: [1, 2]
+  Standard:
+    min_minutes: 15
+    typical_minutes: 25
+    max_minutes: 28
+    content_segments: [4, 5]
+    listener_questions: [2, 4]
+  Deep:
+    min_minutes: 28
+    max_minutes: 35
+    content_segments: [5, 7]
+    listener_questions: [3, 5]
+
+# Split into Parts only past this estimate, and only when the subtopics stand alone.
+parts_over_minutes: 35
+# A Deep Episode that doesn't split may run to this, and anything longer is trimmed.
+single_episode_max_minutes: 44
