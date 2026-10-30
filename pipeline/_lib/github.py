@@ -137,6 +137,46 @@ class GitHub:
         )
         return issue["html_url"]
 
+    def pull_request(self, number: int) -> dict:
+        return self._request("GET", f"{API}/repos/{self.repo}/pulls/{number}")
+
+    def pull_files(self, number: int) -> list[dict]:
+        """Every changed file, as GitHub lists it (status, filename, previous_filename)."""
+        files, page = [], 1
+        while True:
+            query = urllib.parse.urlencode({"per_page": 100, "page": page})
+            batch = self._request("GET", f"{API}/repos/{self.repo}/pulls/{number}/files?{query}")
+            files += batch
+            if len(batch) < 100:
+                return files
+            page += 1
+
+    def pull_commit_messages(self, number: int) -> list[str]:
+        # GitHub lists at most 250 commits here, far more than a Skill branch carries.
+        query = urllib.parse.urlencode({"per_page": 100})
+        url = f"{API}/repos/{self.repo}/pulls/{number}/commits?{query}"
+        return [commit["commit"]["message"] for commit in self._request("GET", url)]
+
+    def add_labels(self, number: int, labels: list[str]) -> None:
+        url = f"{API}/repos/{self.repo}/issues/{number}/labels"
+        self._request("POST", url, {"labels": labels})
+
+    def remove_label(self, number: int, label: str) -> None:
+        url = f"{API}/repos/{self.repo}/issues/{number}/labels/{urllib.parse.quote(label)}"
+        self._request("DELETE", url)
+
+    def comment(self, number: int, body: str) -> None:
+        self._request("POST", f"{API}/repos/{self.repo}/issues/{number}/comments", {"body": body})
+
+    def squash_merge(self, number: int, sha: str) -> None:
+        # GitHub refuses the merge if the head has moved on from sha.
+        url = f"{API}/repos/{self.repo}/pulls/{number}/merge"
+        self._request("PUT", url, {"merge_method": "squash", "sha": sha})
+
+    def dispatch(self, workflow: str, inputs: dict[str, str]) -> None:
+        url = f"{API}/repos/{self.repo}/actions/workflows/{workflow}/dispatches"
+        self._request("POST", url, {"ref": self.branch, "inputs": inputs})
+
     def _request(self, method, url, body=None, content_type="application/json"):
         if body is not None and content_type == "application/json":
             body = json.dumps(body).encode("utf-8")
@@ -149,7 +189,9 @@ class GitHub:
 
         def send():
             with urllib.request.urlopen(request, timeout=300) as response:
-                return json.load(response)
+                # A workflow dispatch answers 204 with no body.
+                data = response.read()
+                return json.loads(data) if data else None
 
         try:
             # A POST or a sha-guarded PUT may have landed before its answer was lost, so only

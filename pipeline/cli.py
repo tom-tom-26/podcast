@@ -1,8 +1,15 @@
 import argparse
 
-from pipeline import lint, publish, render, report, site
+from pipeline import lint, merge, publish, render, report, site
 
-ENTRY_POINTS = {"lint": lint, "render": render, "publish": publish, "site": site, "report": report}
+ENTRY_POINTS = {
+    "lint": lint,
+    "render": render,
+    "publish": publish,
+    "site": site,
+    "report": report,
+    "merge": merge,
+}
 
 
 def main(argv: list[str] | None = None) -> int:

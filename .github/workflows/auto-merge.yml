@@ -1,0 +1,61 @@
+name: auto-merge
+
+# pull_request_target runs this file and the Pipeline as they are on main, never as the branch
+# has them, so a branch that edits either can't decide its own merge. The branch is checked
+# out only as data for lint to read.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  merge:
+    # Only the Skill's own branches, and never one from a fork.
+    if: >-
+      startsWith(github.head_ref, 'claude/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Runs for one PR queue rather than cancel, since a cancel between the merge and the
+    # dispatch would leave a merged Bundle unpublished. A queued run finds the head moved on,
+    # or the PR merged, and stops.
+    concurrency:
+      group: auto-merge-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+    env:
+      PIP_RETRIES: "2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: branch
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - name: Merge or leave for the owner
+        run: pipeline merge --pr "$PR" --sha "$SHA" --repo branch
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+  report:
+    needs: merge
+    # A job cut off by its timeout ends cancelled, which failure() alone would miss.
+    if: failure() || cancelled()
+    uses: ./.github/workflows/report-failure.yml
+    permissions:
+      actions: read
+      contents: read
+      issues: write

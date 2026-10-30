@@ -32,7 +32,7 @@ Also:
 
 - The owner lets the agent merge its own PRs once CI passes, without asking. This overrides any skill or template that says to wait for the owner to confirm or merge. Merging is still never a reason to skip a failing check.
 - Say only what was run. Don't write "all tests pass" or "verified" unless you ran it.
-- The public entry points are `pipeline.lint`, `render`, `publish`, `site` and `report`; `pipeline/cli.py` only dispatches to them. Everything else goes under `pipeline/_lib/`. import-linter fails the build if a listed root package outside `pipeline` imports `_lib`, so a new top-level package must be added to the contract in `pyproject.toml`.
+- The public entry points are `pipeline.lint`, `render`, `publish`, `site`, `report` and `merge`; `pipeline/cli.py` only dispatches to them. Everything else goes under `pipeline/_lib/`. import-linter fails the build if a listed root package outside `pipeline` imports `_lib`, so a new top-level package must be added to the contract in `pyproject.toml`.
 - Tests drive the public entry points with fixture Bundles and a fake GitHub client (spec, Testing Decisions). Don't test private helpers.
 - Audio never goes in git.
 - Build tickets never contain `@claude`.
