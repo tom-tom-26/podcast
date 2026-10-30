@@ -1,0 +1,31 @@
+# The pronunciation lexicon (research/14), applied per chunk before synthesis.
+#
+# entries: how to say a word or phrase an engine gets wrong.
+#   term    as written in the Script; whole word, case-sensitive; may be a phrase
+#   kokoro  /phonemes/ in espeak-ng en-gb with stress marks, or a lower-case respelling
+#           that espeak reads (no capitals: they read as letters)
+#   pocket  text Pocket TTS reads instead: hyphenated chunks of real syllables (W-H-O,
+#           Zeit-gayber), never run-together respellings, which it garbles. Omit it to
+#           leave the term as written: Pocket's own front end reads most terms right
+#   by      who added it and when: skill, owner, review
+#   note    the human version ("owner: KOH-koh-roh") and why
+#
+# verified: all-capital words that every roster voice reads correctly as written.
+# Any other capitals word needs an entry; digits are allowed only inside an entry's term.
+
+verified: [HRV, BDNF, LDL, DNA, UK, NHS, BBC, GDP, ADHD, PTSD, MRI, HIV, CEO, EU, NASA, NATO, UNESCO, FIFA, ATP]
+
+entries:
+  - {term: WHO, kokoro: /dˈʌbəljuː ˈeɪtʃ ˈəʊ/, pocket: W-H-O, by: review 2026-10-29, note: espeak says "who"}
+  - {term: REM, kokoro: rem, by: review 2026-10-29, note: said as a word}
+  - {term: SSRIs, kokoro: /ˈɛsˈɛsˈɑːɹaɪz/, pocket: "S-S-R-I's", by: review 2026-10-29, note: "espeak says ess-sree"}
+  - {term: SSRI, kokoro: /ˈɛsˈɛsˈɑːɹˈaɪ/, pocket: S-S-R-I, by: review 2026-10-29}
+  - {term: IVF, kokoro: /ˈaɪvˈiːˈɛf/, by: review 2026-10-29, note: espeak reads it as one syllable}
+  - {term: ETF, kokoro: /ˈiːtˈiːˈɛf/, by: review 2026-10-29}
+  - {term: IMF, kokoro: /ˈaɪˈɛmˈɛf/, by: review 2026-10-29}
+  - {term: ECB, kokoro: /ˈiːsˈiːbˈiː/, by: review 2026-10-29}
+  - {term: Q and A, kokoro: /kjˈuː ənd ˈeɪ/, by: review 2026-10-29, note: espeak turns a lone A into a schwa}
+  - {term: CYP1A2, kokoro: /sˈiːwˈaɪpˈiː wˈɒn ˈeɪ tˈuː/, by: review 2026-10-29, note: an enzyme; Pocket reads it right}
+  - {term: Zeitgeber, kokoro: /tsˈaɪtɡeɪbə/, pocket: Zeit-gayber, by: review 2026-10-29, note: TSITE-gay-ber}
+  - {term: Porkka-Heiskanen, kokoro: /pˈɔːkə hˈeɪskɑːnən/, pocket: Porka Hayskanen, by: review 2026-10-29, note: Finnish, PORK-ka HAY-ska-nen}
+  - {term: Kokoro, kokoro: /kˈəʊkəʊɹəʊ/, by: review 2026-10-29, note: Japanese, KOH-koh-roh}

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import yaml
 
+from pipeline._lib.lexicon import entry_problems
 from pipeline._lib.script import ScriptError, parse_script
 
 BUNDLE_FILES = ["script.md", "meta.yaml", "show_notes.md", "ledger.md", "lint_report.yaml"]
@@ -54,6 +55,7 @@ def _meta_problems(path: Path) -> list[str]:
         for key in ("style_guide_version", "deslop_version")
         if not _whole_number(meta.get(key))
     ]
+    problems += [f"pronunciations: {p}" for p in entry_problems(meta.get("pronunciations"))]
     revision = meta.get("revision")
     if not _whole_number(revision):
         problems.append("revision must be a whole number from 1")

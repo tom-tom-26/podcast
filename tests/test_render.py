@@ -4,6 +4,7 @@ import wave
 import numpy as np
 
 from pipeline import render
+from tests.test_lint import REPO
 
 RATE = 24000
 
@@ -23,7 +24,7 @@ class FakeEngine:
 def render_smoke(bundle, tmp_path):
     engine = FakeEngine()
     wav = tmp_path / "out.wav"
-    render.render_bundle(bundle, wav, synthesise=engine)
+    render.render_bundle(bundle, wav, repo=REPO, synthesise=engine)
     return engine, wav
 
 

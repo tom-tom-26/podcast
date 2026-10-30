@@ -20,7 +20,8 @@ jobs:
           cache: pip
       - name: Install ffmpeg
         run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-      - run: pip install -e ".[dev]"
+      # The Kokoro extra brings espeak, which the Lexicon tests phonemize with.
+      - run: pip install -e ".[dev,kokoro]"
       - run: ruff check .
       - run: ruff format --check .
       - run: lint-imports

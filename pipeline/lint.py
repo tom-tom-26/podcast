@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 
 from pipeline._lib.bundle import bundle_problems, load_meta
+from pipeline._lib.lexicon import load_lexicon, phonemize
 from pipeline._lib.rules import (
     claim_problems,
     ledger_ids,
@@ -34,11 +35,19 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--repo",
         type=Path,
         default=Path("."),
-        help="the repo checkout, for the phrase list and the Episode registry",
+        help="the repo checkout, for the phrase list, the Lexicon and the Episode registry",
+    )
+    parser.add_argument(
+        "--pron-check",
+        action="store_true",
+        help="instead of linting, show what Kokoro says for each Lexicon entry in force for "
+        "the Bundle, beside espeak's own reading of the term",
     )
 
 
 def main(args: argparse.Namespace) -> int:
+    if args.pron_check:
+        return pron_check(args.bundle, args.repo)
     started = time.perf_counter()
     # A Windows console can't encode an emoji the lint is reporting; escape it, don't crash.
     sys.stdout.reconfigure(errors="backslashreplace")
@@ -50,6 +59,7 @@ def main(args: argparse.Namespace) -> int:
     warnings = []
     # Later rules need the fields; a broken meta.yaml is already reported above.
     meta = load_meta(bundle) if not any(p.startswith("meta.yaml") for p in problems) else None
+    lexicon = load_lexicon(args.repo, meta and meta.get("pronunciations"))
     texts = {
         file: (bundle / file).read_text(encoding="utf-8")
         for file in ("script.md", "ledger.md", "show_notes.md")
@@ -61,7 +71,7 @@ def main(args: argparse.Namespace) -> int:
     blockable, warnable = [], []
     if "script.md" in texts:
         script = texts["script.md"]
-        problems += tts_problems(script)
+        problems += tts_problems(script, lexicon)
         for number, segment, line in spoken_lines(script):
             blockable.append((f"script.md line {number}", line))
             warnable.append((f"script.md, {segment}", line))
@@ -78,7 +88,7 @@ def main(args: argparse.Namespace) -> int:
         except ScriptError:
             segments = None  # already reported by bundle_problems
         if segments:
-            warnings += style_warnings(segments, meta and meta["variant"])
+            warnings += style_warnings(segments, meta and meta["variant"], lexicon)
             if meta:
                 warnings += pace_warnings(segments, meta)
     if meta:
@@ -125,6 +135,19 @@ def main(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     return 1 if problems else 0
+
+
+def pron_check(bundle: Path, repo: Path) -> int:
+    # Phonemes are the point here, so print them, whatever the console's own encoding.
+    sys.stdout.reconfigure(encoding="utf-8")
+    lexicon = load_lexicon(repo, load_meta(bundle).get("pronunciations"))
+    for term, entry in lexicon.entries.items():
+        print(
+            f"{term:22} kokoro: {lexicon.kokoro_says(term):30} "
+            f"espeak: {phonemize(term, 'en-gb'):30} pocket: {entry.get('pocket') or '(as written)'}"
+        )
+    print("verified:", " ".join(f"{w}={phonemize(w, 'en-gb')}" for w in sorted(lexicon.verified)))
+    return 0
 
 
 def write_report(path: Path, warnings: list[str]) -> None:
