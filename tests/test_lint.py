@@ -12,11 +12,12 @@ from tests.conftest import SMOKE_BUNDLE
 REPO = Path(__file__).parent.parent
 
 
-def lint(bundle, repo=REPO):
+def lint(bundle, repo=REPO, env=None):
     return subprocess.run(
         [sys.executable, "-m", "pipeline", "lint", str(bundle), "--repo", str(repo)],
         capture_output=True,
         text=True,
+        env=env,
     )
 
 
@@ -113,6 +114,8 @@ SKY_LINE = "Look up on a clear afternoon and the sky is blue."
         ("Look up at noon, e.g. on a clear day, and the sky is blue.", "abbreviation"),
         ("Look up at three p.m. and the sky is blue.", "abbreviation"),
         ("Look up with Dr. Rayleigh and the sky is blue.", "abbreviation"),
+        ("Look up at three P.M. and the sky is blue.", "abbreviation"),
+        ("Look up over the U.S. and the sky is blue.", "abbreviation"),
         ("Um, look up on a clear afternoon and the sky is blue.", "filler"),
         ("Look up on a clear afternoon and the sky is blue. [laughs]", "filler"),
         ("Look up on a clear afternoon and the sky is blue. *sighs*", "filler"),
@@ -298,6 +301,9 @@ LONG_PARAGRAPH = " ".join(["The sky is blue."] * 7)
             "three things",
         ),
         ("meta.yaml", "wpm_budget: 165", "wpm_budget: 5", "minutes"),
+        ("script.md", "## Hook", "## Opening", "Hook first"),
+        ("script.md", SKY_LINE, " ".join([SKY_LINE] * 20), "Hook of"),
+        ("script.md", "Have a guess. [think]", "Have a guess.", "[think]"),
     ],
 )
 def test_soft_rule_only_warns(smoke_bundle, file, old, new, message):
@@ -310,10 +316,12 @@ def test_soft_rule_only_warns(smoke_bundle, file, old, new, message):
     assert message in run.stdout
 
 
-def make_history(bundles, ids, script="## Hook\n\nSomething else entirely, said a new way.\n"):
+def make_history(bundles, ids):
     for bundle_id in ids:
         (bundles / bundle_id).mkdir(parents=True)
-        (bundles / bundle_id / "script.md").write_text(script, encoding="utf-8")
+        (bundles / bundle_id / "script.md").write_text(
+            "## Hook\n\nSomething else entirely, said a new way.\n", encoding="utf-8"
+        )
 
 
 def test_six_words_shared_with_a_recent_bundle_only_warn(tmp_path):
@@ -323,8 +331,8 @@ def test_six_words_shared_with_a_recent_bundle_only_warn(tmp_path):
     run = lint(bundle)
 
     assert run.returncode == 0, run.stdout + run.stderr
+    assert "script.md, Hook: shares the six words 'look up on a clear afternoon'" in run.stdout
     assert "2026-10-01-older" in run.stdout
-    assert "look up on a clear afternoon" in run.stdout
 
 
 def test_six_word_check_reads_only_the_last_ten_bundles(tmp_path):
@@ -418,13 +426,24 @@ def test_smoke_bundle_report_is_up_to_date(smoke_bundle):
 
 def test_actions_get_annotations(smoke_bundle):
     edit(smoke_bundle, "script.md", SKY_LINE, "Look up at 3 in the afternoon.")
-    run = subprocess.run(
-        [sys.executable, "-m", "pipeline", "lint", str(smoke_bundle), "--repo", str(REPO)],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "GITHUB_ACTIONS": "true"},
-    )
+    run = lint(smoke_bundle, env={**os.environ, "GITHUB_ACTIONS": "true"})
 
     assert run.returncode == 1
     assert "::error title=lint 2026-10-30-smoke::script.md line 3: digit '3'" in run.stdout
     assert "::warning title=lint 2026-10-30-smoke::script.md, Roadmap: heteronym" in run.stdout
+
+
+def test_sentence_warning_reason_survives_an_edit_to_its_opening(smoke_bundle):
+    edit(smoke_bundle, "script.md", SKY_LINE, LONG_SENTENCE)
+    lint(smoke_bundle)
+    kept = report(smoke_bundle)
+    for warning in kept:
+        warning["reason"] = "kept on purpose"
+    (smoke_bundle / "lint_report.yaml").write_text(
+        yaml.safe_dump({"warnings": kept}), encoding="utf-8"
+    )
+    edit(smoke_bundle, "script.md", "Look up on a clear", "Gaze up on a clear")
+
+    lint(smoke_bundle)
+
+    assert all(w["reason"] == "kept on purpose" for w in report(smoke_bundle))

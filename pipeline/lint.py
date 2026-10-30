@@ -12,7 +12,7 @@ from pipeline._lib.bundle import bundle_problems, load_meta
 from pipeline._lib.rules import (
     claim_problems,
     ledger_ids,
-    pace_warning,
+    pace_warnings,
     parent_ledger,
     phrase_findings,
     shared_run_warnings,
@@ -43,12 +43,14 @@ def main(args: argparse.Namespace) -> int:
     # A Windows console can't encode an emoji the lint is reporting; escape it, don't crash.
     sys.stdout.reconfigure(errors="backslashreplace")
     bundle = args.bundle
-    rules = yaml.safe_load((args.repo / "config" / "deslop_rules.yaml").read_text(encoding="utf-8"))
+    phrase_list = yaml.safe_load(
+        (args.repo / "config" / "deslop_rules.yaml").read_text(encoding="utf-8")
+    )
     problems = bundle_problems(bundle)
     warnings = []
     # Later rules need the fields; a broken meta.yaml is already reported above.
     meta = load_meta(bundle) if not any(p.startswith("meta.yaml") for p in problems) else None
-    read = {
+    texts = {
         file: (bundle / file).read_text(encoding="utf-8")
         for file in ("script.md", "ledger.md", "show_notes.md")
         if (bundle / file).is_file()
@@ -57,8 +59,8 @@ def main(args: argparse.Namespace) -> int:
     # Firm rules report a line number to fix; warnings name the Segment, so a reason kept in
     # lint_report.yaml still matches after the lines above it move.
     blockable, warnable = [], []
-    if "script.md" in read:
-        script = read["script.md"]
+    if "script.md" in texts:
+        script = texts["script.md"]
         problems += tts_problems(script)
         for number, segment, line in spoken_lines(script):
             blockable.append((f"script.md line {number}", line))
@@ -69,35 +71,36 @@ def main(args: argparse.Namespace) -> int:
             if isinstance(parent, str):
                 problems.append(f"meta.yaml: {parent}")
                 parent = set()
-        if "ledger.md" in read:
-            problems += claim_problems(script, ledger_ids(read["ledger.md"]), parent)
+        if "ledger.md" in texts:
+            problems += claim_problems(script, ledger_ids(texts["ledger.md"]), parent)
         try:
             segments = parse_script(script)
         except ScriptError:
             segments = None  # already reported by bundle_problems
         if segments:
-            warnings += style_warnings(segments)
+            warnings += style_warnings(segments, meta and meta["variant"])
             if meta:
-                warnings += pace_warning(segments, meta)
+                warnings += pace_warnings(segments, meta)
     if meta:
         listing = [(f"meta.yaml {key}", meta[key]) for key in ("title", "summary")]
         blockable += listing
         warnable += listing
-    if "show_notes.md" in read:
-        blockable.append(("show_notes.md", read["show_notes.md"]))
-        warnable.append(("show_notes.md", read["show_notes.md"]))
+    if "show_notes.md" in texts:
+        blockable.append(("show_notes.md", texts["show_notes.md"]))
+        warnable.append(("show_notes.md", texts["show_notes.md"]))
 
     problems += [
         f"{where}: phrase {phrase!r} (F9)"
-        for where, phrase in phrase_findings(blockable, rules["block"])
+        for where, phrase in phrase_findings(blockable, phrase_list["block"])
     ]
     warnings += [
-        f"{where}: phrase {phrase!r}" for where, phrase in phrase_findings(warnable, rules["warn"])
+        f"{where}: phrase {phrase!r}"
+        for where, phrase in phrase_findings(warnable, phrase_list["warn"])
     ]
     warnings += [
         f"{where}: phrase {phrase!r}"
         for where, phrase in phrase_findings(
-            [("show_notes.md", read.get("show_notes.md", ""))], rules["show_notes"]
+            [("show_notes.md", texts.get("show_notes.md", ""))], phrase_list["show_notes"]
         )
     ]
 
@@ -134,10 +137,10 @@ def write_report(path: Path, warnings: list[str]) -> None:
         for w in old_warnings or []
         if isinstance(w, dict) and "warning" in w
     }
-    kept = [{"warning": w, "reason": reasons.get(w)} for w in warnings]
+    entries = [{"warning": w, "reason": reasons.get(w)} for w in warnings]
     path.write_text(
         REPORT_HEADER
-        + yaml.safe_dump({"warnings": kept}, sort_keys=False, allow_unicode=True, width=200),
+        + yaml.safe_dump({"warnings": entries}, sort_keys=False, allow_unicode=True, width=200),
         encoding="utf-8",
         newline="\n",
     )

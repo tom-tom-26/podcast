@@ -7,12 +7,17 @@ import yaml
 
 from pipeline._lib.bundle import BUNDLE_ID
 from pipeline._lib.registry import REGISTRY, load_registry
-from pipeline._lib.script import CLAIM_TAG, PAUSE, ScriptError, Segment, parse_script
+from pipeline._lib.script import CLAIM_TAG, PAUSE, Pause, ScriptError, Segment, parse_script
 
 BANNED_SYMBOLS = re.compile(r"[()\[\]—–/&+%$€£…*_#@\U0001F300-\U0001FAFF\U00002600-\U000027BF]")
 URL = re.compile(r"https?://|www\.|\b[a-z0-9-]+\.(?:com|org|net|gov|edu|io|uk|co)\b", re.I)
-# "No." and "St." are left out: "No." is an everyday spoken answer.
-ABBREVIATION = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|Prof|vs|etc|approx|cf|et al|e\.g|i\.e|a\.m|p\.m)\.")
+# Dotted initials (e.g., a.m., U.S.) plus common short forms. "No." and "St." are left out:
+# "No." is an everyday spoken answer.
+ABBREVIATION = re.compile(
+    r"\b(?:[a-z]\.){2,}"
+    r"|\b(?:Dr|Mr|Mrs|Ms|Prof|vs|etc|approx|cf|et al|Jan|Feb|Aug|Sept|Oct|Nov|Dec)\.",
+    re.I,
+)
 CONTENT_SEGMENT = re.compile(r"\d+:")
 FILLER = re.compile(r"\b(?:um|uh|erm|haha)\b|\[(?:laughs?|sighs?|pause|music)\]|\*[a-z ]+\*", re.I)
 
@@ -128,6 +133,7 @@ COUNT_ANNOUNCEMENT = re.compile(r"\bthree (?:things|ways|reasons|ideas)\b", re.I
 COUNT_ANNOUNCEMENTS = 2 * LENIENCY
 # Variant ceilings in minutes (GLOSSARY, Variant); there is no minimum.
 VARIANT_MINUTES = {"Quick": 15, "Standard": 28, "Deep": 35}
+HOOK_WORDS = {"Quick": 120, "Standard": 150, "Deep": 150}
 HETERONYMS = re.compile(
     r"\b(?:read|lead|live|close|tear|wind|minute|present|record|object|content|wound|produce"
     r"|bass|row|bow|refuse|desert)\b",
@@ -136,9 +142,23 @@ HETERONYMS = re.compile(
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
-def style_warnings(segments: list[Segment]) -> list[str]:
+def style_warnings(segments: list[Segment], variant: str | None) -> list[str]:
     """research/05 section 8's mechanical soft items, as warnings."""
     warnings = []
+    titles = [segment.title for segment in segments]
+    if titles[:2] != ["Hook", "Roadmap"] or titles[-2:] != ["Recap", "Sign-off"]:
+        warnings.append(
+            "script.md: Segments should run Hook first, then Roadmap, and end with Recap "
+            "and Sign-off"
+        )
+    hook_words = sum(
+        len(p.split()) for s in segments if s.title == "Hook" for p in spoken_paragraphs(s)
+    )
+    hook_limit = HOOK_WORDS.get(variant, HOOK_WORDS["Standard"])
+    if hook_words > hook_limit * LENIENCY:
+        warnings.append(
+            f"script.md, Hook: Hook of {hook_words} words (aim for at most {hook_limit})"
+        )
     announcements = 0
     for segment in segments:
         where = f"script.md, {segment.title}"
@@ -151,12 +171,18 @@ def style_warnings(segments: list[Segment]) -> list[str]:
                     f"{where}: paragraph of {len(sentences)} sentences and {words} words "
                     f"(aim for at most 5 and 90)"
                 )
-            for sentence in sentences:
-                if len(sentence.split()) > SENTENCE_WORDS:
-                    warnings.append(
-                        f"{where}: sentence of {len(sentence.split())} words (aim for at most "
-                        f"30): {sentence[:40]}..."
-                    )
+            # No quote of the sentence: a kept reason must survive edits to its wording.
+            warnings += [
+                f"{where}: sentence of {len(s.split())} words (aim for at most 30)"
+                for s in sentences
+                if len(s.split()) > SENTENCE_WORDS
+            ]
+        if CONTENT_SEGMENT.match(segment.title) and not any(
+            isinstance(piece, Pause) and piece.kind == "think"
+            for paragraph in segment.paragraphs
+            for piece in paragraph
+        ):
+            warnings.append(f"{where}: content Segment has no [think] for its Recall prompt")
         text = " ".join(spoken)
         for name, mark in PER_SEGMENT.items():
             if text.count(mark) > 1:
@@ -172,7 +198,7 @@ def style_warnings(segments: list[Segment]) -> list[str]:
     return warnings
 
 
-def pace_warning(segments: list[Segment], meta: dict) -> list[str]:
+def pace_warnings(segments: list[Segment], meta: dict) -> list[str]:
     """Spoken words at the wpm budget, against the Variant's ceiling."""
     words = sum(
         len(paragraph.split()) for segment in segments for paragraph in spoken_paragraphs(segment)
@@ -209,15 +235,18 @@ def shared_run_warnings(bundle: Path) -> list[str]:
     )
     warnings = []
     for other in earlier[-HISTORY:]:
-        shared = set(_runs(other))
-        for run in runs:
+        shared = {run for _, run in _runs(other)}
+        for where, run in runs:
             if run in shared:
-                warnings.append(f"shares the six words {' '.join(run)!r} with {other.name}")
+                warnings.append(
+                    f"{where}: shares the six words {' '.join(run)!r} with {other.name}"
+                )
                 break
     return warnings
 
 
-def _runs(bundle: Path) -> list[tuple[str, ...]]:
+def _runs(bundle: Path) -> list[tuple[str, tuple[str, ...]]]:
+    """(where, six words) for every run in the framing text, in reading order."""
     texts = []
     if (bundle / "script.md").is_file():
         try:
@@ -226,22 +255,25 @@ def _runs(bundle: Path) -> list[tuple[str, ...]]:
             segments = []
         for segment in segments:
             spoken = spoken_paragraphs(segment)
+            where = f"script.md, {segment.title}"
             if segment.title in FRAMING_SEGMENTS:
-                texts += spoken
+                texts += [(where, paragraph) for paragraph in spoken]
             elif CONTENT_SEGMENT.match(segment.title) and spoken:
                 # A content Segment's signpost and question open it.
-                texts.append(SENTENCE_END.split(spoken[0])[0])
+                texts.append((where, SENTENCE_END.split(spoken[0])[0]))
     if (bundle / "meta.yaml").is_file():
         try:
             meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
-            texts.append(str(meta.get("summary") or ""))
+            texts.append(("meta.yaml summary", str(meta.get("summary") or "")))
         except (yaml.YAMLError, AttributeError):
             pass
     if (bundle / "show_notes.md").is_file():
         notes = CORRECTION_NOTE.sub("", (bundle / "show_notes.md").read_text(encoding="utf-8"))
-        texts.append(notes.strip().split("\n\n")[0])
+        texts.append(("show_notes.md", notes.strip().split("\n\n")[0]))
     runs = []
-    for text in texts:
+    for where, text in texts:
         words = re.findall(r"[a-z']+", SPOKEN_CORRECTION.sub("", text).lower())
-        runs += [tuple(words[i : i + RUN_WORDS]) for i in range(len(words) - RUN_WORDS + 1)]
+        runs += [
+            (where, tuple(words[i : i + RUN_WORDS])) for i in range(len(words) - RUN_WORDS + 1)
+        ]
     return runs
