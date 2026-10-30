@@ -3,6 +3,9 @@
 *.m4a
 *.mp3
 
+# TTS models are downloaded and cached by the workflow.
+models/
+
 __pycache__/
 *.egg-info/
 .venv/

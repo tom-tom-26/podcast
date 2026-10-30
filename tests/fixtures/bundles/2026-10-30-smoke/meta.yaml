@@ -1,0 +1,17 @@
+title: Why the sky is blue
+summary: A one-minute smoke test of the whole pipeline, about why the sky is blue.
+variant: Quick
+part: null
+voice: bm_george
+risk_flag: false
+risk_reason: null
+pronunciations: []
+wpm_budget: 165
+target_words: 165
+spoken_words: 160
+style_guide_version: 1
+deslop_version: 1
+parent_episode: null
+questions: []
+revision: 1
+corrections: []

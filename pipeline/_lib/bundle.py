@@ -1,0 +1,55 @@
+import re
+from pathlib import Path
+
+import yaml
+
+from pipeline._lib.script import ScriptError, parse_script
+
+BUNDLE_FILES = ["script.md", "meta.yaml", "show_notes.md", "ledger.md", "lint_report.yaml"]
+BUNDLE_ID = re.compile(r"\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*")
+VARIANTS = {"Quick", "Standard", "Deep"}
+
+
+def bundle_problems(bundle: Path) -> list[str]:
+    """The Bundle schema problems that block it, as one message each."""
+    problems = []
+    if not BUNDLE_ID.fullmatch(bundle.name):
+        problems.append(f"folder name is not a Bundle id (<date>-<slug>): {bundle.name}")
+    problems += [f"{file}: missing" for file in BUNDLE_FILES if not (bundle / file).is_file()]
+    if (bundle / "meta.yaml").is_file():
+        problems += [f"meta.yaml: {p}" for p in _meta_problems(bundle / "meta.yaml")]
+    if (bundle / "lint_report.yaml").is_file():
+        try:
+            yaml.safe_load((bundle / "lint_report.yaml").read_text(encoding="utf-8"))
+        except yaml.YAMLError as error:
+            problems.append(f"lint_report.yaml: not valid YAML: {error}")
+    if (bundle / "script.md").is_file():
+        try:
+            parse_script((bundle / "script.md").read_text(encoding="utf-8"))
+        except ScriptError as error:
+            problems.append(f"script.md: {error}")
+    return problems
+
+
+def load_meta(bundle: Path) -> dict:
+    return yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
+
+
+def _meta_problems(path: Path) -> list[str]:
+    try:
+        meta = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        return [f"not valid YAML: {error}"]
+    if not isinstance(meta, dict):
+        return ["not a mapping of fields"]
+    problems = [
+        f"{key} must be non-empty text"
+        for key in ("title", "summary", "voice")
+        if not isinstance(meta.get(key), str) or not meta[key].strip()
+    ]
+    if meta.get("variant") not in VARIANTS:
+        problems.append(f"variant must be one of {', '.join(sorted(VARIANTS))}")
+    revision = meta.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        problems.append("revision must be a whole number from 1")
+    return problems
