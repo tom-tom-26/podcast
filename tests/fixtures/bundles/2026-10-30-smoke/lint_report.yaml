@@ -1,1 +1,7 @@
-warnings: []
+# Written by pipeline lint. Give each warning you keep a one-line reason; the reason
+# stays as long as the warning does.
+warnings:
+- warning: 'script.md, Roadmap: heteronym ''minute'': check the reading'
+  reason: "'minute' as time, which Kokoro reads right here"
+- warning: 'script.md, Sign-off: phrase ''Thanks for listening'''
+  reason: The smoke Bundle exercises a kept warning; a real Sign-off would drop it

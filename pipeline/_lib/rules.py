@@ -1,0 +1,247 @@
+"""The lint's rules over a Bundle's text: firm ones block, the rest warn (spec, Pipeline > lint)."""
+
+import re
+from pathlib import Path
+
+import yaml
+
+from pipeline._lib.bundle import BUNDLE_ID
+from pipeline._lib.registry import REGISTRY, load_registry
+from pipeline._lib.script import CLAIM_TAG, PAUSE, ScriptError, Segment, parse_script
+
+BANNED_SYMBOLS = re.compile(r"[()\[\]—–/&+%$€£…*_#@\U0001F300-\U0001FAFF\U00002600-\U000027BF]")
+URL = re.compile(r"https?://|www\.|\b[a-z0-9-]+\.(?:com|org|net|gov|edu|io|uk|co)\b", re.I)
+# "No." and "St." are left out: "No." is an everyday spoken answer.
+ABBREVIATION = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|Prof|vs|etc|approx|cf|et al|e\.g|i\.e|a\.m|p\.m)\.")
+CONTENT_SEGMENT = re.compile(r"\d+:")
+FILLER = re.compile(r"\b(?:um|uh|erm|haha)\b|\[(?:laughs?|sighs?|pause|music)\]|\*[a-z ]+\*", re.I)
+
+
+def spoken_lines(script: str) -> list[tuple[int, str, str]]:
+    """Script lines read aloud, as (line number, Segment title, text), markup removed."""
+    lines = []
+    segment = ""
+    for number, line in enumerate(script.splitlines(), start=1):
+        if line.startswith("## "):
+            segment = line[3:].strip()
+            continue
+        spoken = PAUSE.sub("", CLAIM_TAG.sub("", line)).strip()
+        if spoken:
+            lines.append((number, segment, spoken))
+    return lines
+
+
+def spoken_paragraphs(segment: Segment) -> list[str]:
+    return [
+        " ".join(p for p in paragraph if isinstance(p, str)) for paragraph in segment.paragraphs
+    ]
+
+
+def phrase_findings(texts: list[tuple[str, str]], phrases: list[str]) -> list[tuple[str, str]]:
+    """(where, phrase) for each listed phrase found in each (where, text)."""
+    found = []
+    for phrase in phrases:
+        pattern = re.compile(rf"(?<!\w)(?:{phrase})(?!\w)", re.I)
+        found += [(where, m[0]) for where, text in texts for m in pattern.finditer(text)]
+    return found
+
+
+def ledger_ids(ledger: str) -> set[str]:
+    return {line.split("|", 1)[0].strip() for line in ledger.splitlines() if "|" in line}
+
+
+def parent_ledger(bundle: Path, repo: Path, parent_episode: str) -> set[str] | str:
+    """A Q&A parent's ledger ids, found through the Episode registry, or why it can't be read.
+    The parent Bundle sits beside this one."""
+    registry = repo / REGISTRY
+    if not registry.is_file():
+        return f"parent_episode {parent_episode}: no Episode registry at {registry}"
+    for episode in load_registry(registry.read_text(encoding="utf-8")):
+        if episode["episode_id"] == parent_episode:
+            ledger = bundle.parent / episode["bundle_id"] / "ledger.md"
+            if not ledger.is_file():
+                return f"parent_episode {parent_episode}: no ledger at {ledger}"
+            return ledger_ids(ledger.read_text(encoding="utf-8"))
+    return f"parent_episode {parent_episode}: not in the Episode registry"
+
+
+def claim_problems(script: str, ledger: set[str], parent: set[str] | None) -> list[str]:
+    """Claim tags that resolve to no ledger line, and content Segments with no Claim tag.
+    `{p:cN}` tags resolve against `parent`, the Q&A parent's ledger."""
+    problems = []
+    segment, tagged = None, False
+
+    def end_segment() -> None:
+        # Content Segments are the numbered ones, `## 1: Title` (research/05 6.3).
+        if segment and CONTENT_SEGMENT.match(segment) and not tagged:
+            problems.append(f"script.md, {segment}: content Segment has no Claim tag")
+
+    for number, line in enumerate(script.splitlines(), start=1):
+        if line.startswith("## "):
+            end_segment()
+            segment, tagged = line[3:].strip(), False
+            continue
+        for tag in CLAIM_TAG.findall(line):
+            tagged = True
+            for claim in re.findall(r"(?:p:)?c\d+", tag):
+                where = f"script.md line {number}: Claim tag {claim}"
+                if not claim.startswith("p:"):
+                    if claim not in ledger:
+                        problems.append(f"{where} has no ledger line")
+                elif parent is None:
+                    problems.append(f"{where} but meta.yaml has no parent_episode")
+                elif claim[2:] not in parent:
+                    problems.append(f"{where} has no line in the parent's ledger")
+    end_segment()
+    return problems
+
+
+def tts_problems(script: str) -> list[str]:
+    """Written forms the TTS engine would read wrongly or literally (research/14)."""
+    problems = []
+    for number, _, line in spoken_lines(script):
+        where = f"script.md line {number}"
+        problems += [
+            f"{where}: digit {m[0]!r}: write it as words" for m in re.finditer(r"\d+", line)
+        ]
+        problems += [
+            f"{where}: filler or stage direction {m[0]!r} (F5)" for m in FILLER.finditer(line)
+        ]
+        problems += [f"{where}: URL {m[0]!r}: not in spoken text" for m in URL.finditer(line)]
+        problems += [
+            f"{where}: abbreviation {m[0]!r}: write it out" for m in ABBREVIATION.finditer(line)
+        ]
+        problems += [
+            f"{where}: symbol {s!r}: say it in words"
+            for s in sorted(set(BANNED_SYMBOLS.findall(line)))
+        ]
+    return problems
+
+
+# Soft limits warn only past research/05's number plus its 25% leniency (12.2).
+LENIENCY = 1.25
+SENTENCE_WORDS = 30 * LENIENCY
+PARAGRAPH_SENTENCES = 5 * LENIENCY
+PARAGRAPH_WORDS = 90 * LENIENCY
+PER_SEGMENT = {"exclamation mark": "!", "colon": ":", "semicolon": ";"}
+COUNT_ANNOUNCEMENT = re.compile(r"\bthree (?:things|ways|reasons|ideas)\b", re.I)
+COUNT_ANNOUNCEMENTS = 2 * LENIENCY
+# Variant ceilings in minutes (GLOSSARY, Variant); there is no minimum.
+VARIANT_MINUTES = {"Quick": 15, "Standard": 28, "Deep": 35}
+HETERONYMS = re.compile(
+    r"\b(?:read|lead|live|close|tear|wind|minute|present|record|object|content|wound|produce"
+    r"|bass|row|bow|refuse|desert)\b",
+    re.I,
+)
+SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def style_warnings(segments: list[Segment]) -> list[str]:
+    """research/05 section 8's mechanical soft items, as warnings."""
+    warnings = []
+    announcements = 0
+    for segment in segments:
+        where = f"script.md, {segment.title}"
+        spoken = spoken_paragraphs(segment)
+        for paragraph in spoken:
+            sentences = [s for s in SENTENCE_END.split(paragraph) if s]
+            words = len(paragraph.split())
+            if len(sentences) > PARAGRAPH_SENTENCES or words > PARAGRAPH_WORDS:
+                warnings.append(
+                    f"{where}: paragraph of {len(sentences)} sentences and {words} words "
+                    f"(aim for at most 5 and 90)"
+                )
+            for sentence in sentences:
+                if len(sentence.split()) > SENTENCE_WORDS:
+                    warnings.append(
+                        f"{where}: sentence of {len(sentence.split())} words (aim for at most "
+                        f"30): {sentence[:40]}..."
+                    )
+        text = " ".join(spoken)
+        for name, mark in PER_SEGMENT.items():
+            if text.count(mark) > 1:
+                warnings.append(f"{where}: {text.count(mark)} {name}s (aim for one a Segment)")
+        warnings += [
+            f"{where}: heteronym {m[0]!r}: check the reading" for m in HETERONYMS.finditer(text)
+        ]
+        announcements += len(COUNT_ANNOUNCEMENT.findall(text))
+    if announcements > COUNT_ANNOUNCEMENTS:
+        warnings.append(
+            f"script.md: {announcements} 'three things' announcements (aim for at most two)"
+        )
+    return warnings
+
+
+def pace_warning(segments: list[Segment], meta: dict) -> list[str]:
+    """Spoken words at the wpm budget, against the Variant's ceiling."""
+    words = sum(
+        len(paragraph.split()) for segment in segments for paragraph in spoken_paragraphs(segment)
+    )
+    ceiling = VARIANT_MINUTES[meta["variant"]]
+    budget = meta.get("wpm_budget")
+    if not isinstance(budget, int) or budget <= 0:
+        return [f"meta.yaml: wpm_budget {budget!r} is not a positive number, so pace is unchecked"]
+    minutes = words / budget
+    if minutes > ceiling * LENIENCY:
+        return [
+            f"script.md: {words} words at {budget} wpm is {minutes:.0f} minutes, over the "
+            f"{meta['variant']} ceiling of {ceiling}"
+        ]
+    return []
+
+
+# The correction lines (ticket 16) are worded the same in every corrected Episode by design.
+CORRECTION_NOTE = re.compile(r"^Corrected \d{4}-\d{2}-\d{2}:.*$", re.M)
+SPOKEN_CORRECTION = re.compile(r"This version corrects what an earlier one said about [^.]*\.")
+RUN_WORDS = 6
+HISTORY = 10
+FRAMING_SEGMENTS = {"Hook", "Roadmap", "Sign-off"}
+
+
+def shared_run_warnings(bundle: Path) -> list[str]:
+    """Six-word runs in this Bundle's framing text that one of the last ten Bundles also has,
+    the template creeping in across Episodes (research/18 S13)."""
+    runs = _runs(bundle)
+    earlier = sorted(
+        other
+        for other in bundle.parent.iterdir()
+        if other.is_dir() and BUNDLE_ID.fullmatch(other.name) and other.name < bundle.name
+    )
+    warnings = []
+    for other in earlier[-HISTORY:]:
+        shared = set(_runs(other))
+        for run in runs:
+            if run in shared:
+                warnings.append(f"shares the six words {' '.join(run)!r} with {other.name}")
+                break
+    return warnings
+
+
+def _runs(bundle: Path) -> list[tuple[str, ...]]:
+    texts = []
+    if (bundle / "script.md").is_file():
+        try:
+            segments = parse_script((bundle / "script.md").read_text(encoding="utf-8"))
+        except ScriptError:
+            segments = []
+        for segment in segments:
+            spoken = spoken_paragraphs(segment)
+            if segment.title in FRAMING_SEGMENTS:
+                texts += spoken
+            elif CONTENT_SEGMENT.match(segment.title) and spoken:
+                # A content Segment's signpost and question open it.
+                texts.append(SENTENCE_END.split(spoken[0])[0])
+    if (bundle / "meta.yaml").is_file():
+        try:
+            meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
+            texts.append(str(meta.get("summary") or ""))
+        except (yaml.YAMLError, AttributeError):
+            pass
+    if (bundle / "show_notes.md").is_file():
+        notes = CORRECTION_NOTE.sub("", (bundle / "show_notes.md").read_text(encoding="utf-8"))
+        texts.append(notes.strip().split("\n\n")[0])
+    runs = []
+    for text in texts:
+        words = re.findall(r"[a-z']+", SPOKEN_CORRECTION.sub("", text).lower())
+        runs += [tuple(words[i : i + RUN_WORDS]) for i in range(len(words) - RUN_WORDS + 1)]
+    return runs

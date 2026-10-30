@@ -49,7 +49,16 @@ def _meta_problems(path: Path) -> list[str]:
     ]
     if meta.get("variant") not in VARIANTS:
         problems.append(f"variant must be one of {', '.join(sorted(VARIANTS))}")
+    problems += [
+        f"{key} must be a whole number from 1"
+        for key in ("style_guide_version", "deslop_version")
+        if not _whole_number(meta.get(key))
+    ]
     revision = meta.get("revision")
-    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+    if not _whole_number(revision):
         problems.append("revision must be a whole number from 1")
     return problems
+
+
+def _whole_number(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
