@@ -90,7 +90,10 @@ def main(args: argparse.Namespace) -> int:
         except ScriptError:
             segments = None  # already reported by bundle_problems
         if segments:
-            warnings += style_warnings(segments, meta and meta["variant"], lexicon)
+            qa = meta and meta.get("parent_episode") and meta.get("questions")
+            # A malformed list is already blocking; the Episode shape rules still apply.
+            questions = qa if isinstance(qa, list) else None
+            warnings += style_warnings(segments, meta and meta["variant"], lexicon, questions)
             if meta:
                 warnings += pace_warnings(segments, meta)
     if meta:

@@ -237,6 +237,7 @@ def qa_bundle(tmp_path):
     )
     qa = Path(shutil.copytree(SMOKE_BUNDLE, bundles / "2026-11-02-smoke-qa"))
     edit(qa, "meta.yaml", "parent_episode: null", "parent_episode: ep-001-smoke")
+    edit(qa, "meta.yaml", "questions: []", 'questions: ["Why isn\'t the sky violet, then?"]')
     edit(qa, "script.md", "{c1}", "{p:c1}")
     return qa
 
@@ -272,6 +273,27 @@ def test_parent_episode_missing_from_the_registry_blocks(qa_bundle):
 
     assert run.returncode == 1
     assert "ep-009-gone" in run.stdout
+
+
+@pytest.mark.parametrize(
+    "questions", ["questions: []", "questions: null", "questions: ['Why?', '']", "questions: Why?"]
+)
+def test_a_qa_without_the_owners_questions_blocks(qa_bundle, questions):
+    edit(qa_bundle, "meta.yaml", 'questions: ["Why isn\'t the sky violet, then?"]', questions)
+
+    run = lint(qa_bundle, repo=qa_bundle.parent.parent)
+
+    assert run.returncode == 1
+    assert "meta.yaml: questions" in run.stdout
+
+
+def test_questions_without_a_parent_episode_block(smoke_bundle):
+    edit(smoke_bundle, "meta.yaml", "questions: []", "questions: ['Why?']")
+
+    run = lint(smoke_bundle)
+
+    assert run.returncode == 1
+    assert "meta.yaml: questions" in run.stdout
 
 
 @pytest.mark.parametrize(
@@ -329,6 +351,71 @@ def test_phrase_list_comes_from_config(qa_bundle):
 
     assert run.returncode == 0, run.stdout + run.stderr
     assert "scatter" in run.stdout
+
+
+QA_SCRIPT = """## Hook
+
+Episode one said blue light scatters most. {p:c2} So why isn't the sky violet?
+Mostly, it's your eyes.
+
+## 1: Why not violet
+
+Last time we said short waves scatter most. {p:c2}
+Violet is shorter still, but sunlight carries less of it. {c3} So the sky leans blue.
+
+## 2: Why sunsets go red
+
+At sunset the light crosses far more air. {c4}
+The blue is scattered away before it reaches you, so red is left.
+
+## Recap
+
+Here's one to hold on to. Why does the sunset go red? [think] More air, so less blue. {c4}
+
+## Sign-off
+
+For the first half of the story, go back to episode one.
+"""
+
+
+def as_qa_shape(bundle, questions):
+    (bundle / "script.md").write_text(QA_SCRIPT, encoding="utf-8")
+    edit(
+        bundle,
+        "meta.yaml",
+        'questions: ["Why isn\'t the sky violet, then?"]',
+        f"questions: {questions!r}",
+    )
+
+
+def test_a_qa_in_its_own_shape_raises_no_shape_warnings(qa_bundle):
+    as_qa_shape(qa_bundle, ["Why isn't the sky violet, then?", "And sunsets?"])
+
+    run = lint(qa_bundle, repo=qa_bundle.parent.parent)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "Segments should run" not in run.stdout
+    assert "[think]" not in run.stdout
+    assert "questions" not in run.stdout
+
+
+def test_a_qa_with_no_recall_prompt_only_warns(qa_bundle):
+    as_qa_shape(qa_bundle, ["Why isn't the sky violet, then?", "And sunsets?"])
+    edit(qa_bundle, "script.md", " [think]", "")
+
+    run = lint(qa_bundle, repo=qa_bundle.parent.parent)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "script.md: a Q&A has no [think] for its Recall prompt" in run.stdout
+
+
+def test_a_qa_with_a_segment_count_unlike_its_questions_only_warns(qa_bundle):
+    as_qa_shape(qa_bundle, ["Why isn't the sky violet, then?"])
+
+    run = lint(qa_bundle, repo=qa_bundle.parent.parent)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "script.md: 2 content Segments for 1 question" in run.stdout
 
 
 LONG_SENTENCE = (
