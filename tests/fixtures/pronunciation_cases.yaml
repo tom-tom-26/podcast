@@ -1,0 +1,29 @@
+# research/14's 20 worst pronunciation cases, as written (raw) and in spoken form.
+#   raw_blocks  the lint blocks the raw line (spoken form is the fix, not the lexicon)
+#   kokoro      phonemes Kokoro must be given for the spoken line (the lexicon's fix)
+#   pocket      text Pocket must be given for the spoken line
+# Case 17 is fixed by the Bundle's own entry, `pronunciations` in research/14's bundle_meta.yaml.
+cases:
+  - {raw: Take 5 mg at night., spoken: Take five milligrams at night., raw_blocks: true}
+  - {raw: Aim for 1.5 g/kg of protein., spoken: Aim for one point five grams of protein per kilogram., raw_blocks: true}
+  - {raw: Sleep 7-9 hours., spoken: Sleep seven to nine hours., raw_blocks: true}
+  - {raw: Stop by 3:00 p.m. at the latest., spoken: Stop by three in the afternoon at the latest., raw_blocks: true}
+  - {raw: "The gap was 0.2 s, about 150 ms.", spoken: "The gap was a fifth of a second, about a hundred and fifty milliseconds.", raw_blocks: true}
+  - {raw: Dr. Walker says e.g. coffee vs. tea., spoken: "Doctor Walker says that coffee, for example, is worse than tea.", raw_blocks: true}
+  - {raw: The WHO advises against it., spoken: The WHO advises against it., raw_blocks: false, kokoro: dˈʌbəljuː ˈeɪtʃ ˈəʊ ɐdvˈaɪzɪz, pocket: The W-H-O advises against it.}
+  - {raw: ATP powers the cell., spoken: ATP powers the cell., raw_blocks: false}
+  - {raw: REM sleep comes later in the night., spoken: REM sleep comes later in the night., raw_blocks: false, kokoro: ɹˈɛm slˈiːp}
+  - {raw: SSRIs are common antidepressants., spoken: SSRIs are common antidepressants., raw_blocks: false, kokoro: ˈɛsˈɛsˈɑːɹaɪz, pocket: S-S-R-I's are common antidepressants.}
+  - {raw: It costs $30 a month., spoken: It costs thirty dollars a month., raw_blocks: true}
+  - {raw: "That is 2x faster, about 10k steps.", spoken: "That is twice as fast, about ten thousand steps.", raw_blocks: true}
+  - {raw: In 1998 the study began., spoken: In nineteen ninety-eight the study began., raw_blocks: true}
+  - {raw: Omega-3s are fats., spoken: Omega-threes are fats., raw_blocks: true}
+  - {raw: A short Q&A follows., spoken: A short Q and A follows., raw_blocks: true, kokoro: ɐ ʃˈɔːt kjˈuː ənd ˈeɪ fˈɒləʊz}
+  - {raw: The Zeitgeber resets your clock., spoken: The Zeitgeber resets your clock., raw_blocks: false, kokoro: tsˈaɪtɡeɪbə, pocket: The Zeit-gayber resets your clock.}
+  - {raw: I read it yesterday., spoken: I read it yesterday., raw_blocks: false, kokoro: ɹˈɛd ɪt jˈɛstədˌeɪ, pocket: I red it yesterday.}
+  - {raw: The enzyme CYP1A2 clears it., spoken: The enzyme CYP1A2 clears it., raw_blocks: false, kokoro: sˈiːwˈaɪpˈiː wˈɒn ˈeɪ tˈuː}
+  - {raw: Tarja Porkka-Heiskanen measured it., spoken: Tarja Porkka-Heiskanen measured it., raw_blocks: false, kokoro: pˈɔːkə hˈeɪskɑːnən, pocket: Tarja Porka Hayskanen measured it.}
+  - {raw: The voice is Kokoro., spoken: The voice is Kokoro., raw_blocks: false, kokoro: kˈəʊkəʊɹəʊ}
+
+bundle_pronunciations:
+  - {term: read it yesterday, kokoro: red it yesterday, pocket: red it yesterday, by: skill 2026-10-29, note: past tense}

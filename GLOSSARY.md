@@ -64,6 +64,10 @@
 
 **Voice roster**: `config/voices.yaml`, each voice's engine and settings, and the credit line a CC BY voice needs.
 
+**Lexicon**: `config/lexicon.yaml`, how each engine should say the terms it gets wrong, plus the `verified:` capitals words every roster voice reads right as written. A Bundle's `pronunciations` use the same entry shape and win for that Episode (research/14).
+
+**Chunk**: One stretch of a Script sent to the TTS engine in a single call. A chunk never crosses a paragraph, `[beat]`, `[think]` or Segment heading.
+
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).

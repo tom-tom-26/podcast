@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 
 from pipeline._lib.bundle import BUNDLE_ID
+from pipeline._lib.lexicon import Lexicon
 from pipeline._lib.registry import REGISTRY, load_registry
 from pipeline._lib.script import CLAIM_TAG, PAUSE, Pause, ScriptError, Segment, parse_script
 
@@ -101,11 +102,17 @@ def claim_problems(script: str, ledger: set[str], parent: set[str] | None) -> li
     return problems
 
 
-def tts_problems(script: str) -> list[str]:
-    """Written forms the TTS engine would read wrongly or literally (research/14)."""
+def tts_problems(script: str, lexicon: Lexicon) -> list[str]:
+    """Written forms the TTS engine would read wrongly or literally (research/14). A Lexicon
+    term is exempt, so CYP1A2 can stay in the Script once it has an entry."""
     problems = []
     for number, _, line in spoken_lines(script):
         where = f"script.md line {number}"
+        problems += [
+            f"{where}: capitals {word!r}: not verified; add a Lexicon entry or say it another way"
+            for word in lexicon.unverified_capitals(line)
+        ]
+        line = lexicon.without_terms(line)
         problems += [
             f"{where}: digit {m[0]!r}: write it as words" for m in re.finditer(r"\d+", line)
         ]
@@ -142,7 +149,7 @@ HETERONYMS = re.compile(
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
-def style_warnings(segments: list[Segment], variant: str | None) -> list[str]:
+def style_warnings(segments: list[Segment], variant: str | None, lexicon: Lexicon) -> list[str]:
     """research/05 section 8's mechanical soft items, as warnings."""
     warnings = []
     titles = [segment.title for segment in segments]
@@ -188,7 +195,8 @@ def style_warnings(segments: list[Segment], variant: str | None) -> list[str]:
             if text.count(mark) > 1:
                 warnings.append(f"{where}: {text.count(mark)} {name}s (aim for one a Segment)")
         warnings += [
-            f"{where}: heteronym {m[0]!r}: check the reading" for m in HETERONYMS.finditer(text)
+            f"{where}: heteronym {m[0]!r}: check the reading"
+            for m in HETERONYMS.finditer(lexicon.without_terms(text))
         ]
         announcements += len(COUNT_ANNOUNCEMENT.findall(text))
     if announcements > COUNT_ANNOUNCEMENTS:

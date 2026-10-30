@@ -56,7 +56,7 @@ Then stop. A session works only the build ticket the owner named and never start
 ## Commands
 
 ```
-pip install -e ".[dev]"
+pip install -e ".[dev,kokoro]"
 pre-commit install
 ruff check . && ruff format --check .
 lint-imports

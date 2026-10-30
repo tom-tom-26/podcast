@@ -18,6 +18,7 @@ from pipeline._lib.feed import build_feed, feed_problems
 from pipeline._lib.github import GitHub
 from pipeline._lib.live import live_problems
 from pipeline._lib.registry import REGISTRY, load_registry
+from pipeline._lib.roster import load_roster
 
 COVER_SIZE = 3000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -53,7 +54,7 @@ def main(args: argparse.Namespace, github=None) -> int:
 
     github = github or GitHub.from_env()
     show = yaml.safe_load((args.repo / "config" / "show.yaml").read_text(encoding="utf-8"))
-    roster = yaml.safe_load((args.repo / "config" / "voices.yaml").read_text(encoding="utf-8"))
+    roster = load_roster(args.repo)
     if args.out.exists() and any(args.out.iterdir()):
         print(f"site: {args.out} is not empty; build into a fresh folder", file=sys.stderr)
         return 1
@@ -65,7 +66,7 @@ def main(args: argparse.Namespace, github=None) -> int:
         bundle = args.repo / "bundles" / episode["bundle_id"]
         meta = load_meta(bundle)
         notes = (bundle / "show_notes.md").read_text(encoding="utf-8").rstrip()
-        credit = roster["voices"].get(episode["voice"], {}).get("credit")
+        credit = roster.get(episode["voice"], {}).get("credit")
         if credit:
             notes += f"\n\n{credit}"
         published = datetime.fromisoformat(github.published_at(episode["episode_id"]))
