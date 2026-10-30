@@ -4,10 +4,10 @@ From ticket 06 with recommendations 1-5 signed off, research/05 sections 2.5, 2.
 
 ## Source profiles
 
-Each field of topics has a Source profile: what counts as strong evidence, what to watch for, and what triggers the Higher-risk flag. Use the matching field file in `learnings/fields/` when it exists; otherwise use the table in `docs/wayfinder/research/05-episode-template-and-style-guide.md` section 13.
+Each field of topics has a Source profile: what counts as strong evidence, what to watch for, and what triggers the Higher-risk flag. Each one is at the top of its field file in `learnings/fields/`; `learnings/INDEX.md` matches a Topic to its field.
 
 - **Overlap rule:** a Topic can draw on two profiles (sport training uses Sport and Health). The stricter flag rule applies.
-- **No profile fits:** draft one with the same three columns during research, borrowing the risk triggers of the strictest neighbouring profile, and use it. Mention the draft in the final message; saving it to Learnings comes with Learnings.
+- **No profile fits:** draft one during research and use it; "A new field" in `references/learnings.md` says how.
 
 ## The ladder
 
