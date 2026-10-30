@@ -127,7 +127,6 @@ jobs:
           ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      # The .m4a and its ASR report.
       - if: ${{ inputs.dry_run }}
         uses: actions/upload-artifact@v7
         with:

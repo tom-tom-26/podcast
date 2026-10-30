@@ -11,7 +11,7 @@ import yaml
 from pipeline import render
 from pipeline._lib.bundle import BUNDLE_ID, load_meta
 from pipeline._lib.encode import duration_seconds, encode_episode
-from pipeline._lib.gates import check_episode, transcribe
+from pipeline._lib.gates import PACE_WPM, check_episode, transcribe
 from pipeline._lib.github import GitHub
 from pipeline._lib.lexicon import load_lexicon
 from pipeline._lib.registry import REGISTRY, dump_registry, load_registry, next_number
@@ -134,7 +134,7 @@ def _encode_and_gate(args, m4a: Path, name: str, transcribe, encode, synthesise)
         encode(args.wav, m4a)
         chunk_map = yaml.safe_load(render.chunk_map_path(args.wav).read_text(encoding="utf-8"))
         verdict = check_episode(
-            m4a, chunk_map, transcribe(m4a), lexicon, meta.get("wpm_budget") or 165
+            m4a, chunk_map, transcribe(m4a), lexicon, meta.get("wpm_budget") or PACE_WPM
         )
         for warning in verdict.warnings:
             print(f"publish {name}: {warning}; a warning only", file=sys.stderr)
@@ -165,7 +165,8 @@ def _encode_and_gate(args, m4a: Path, name: str, transcribe, encode, synthesise)
             )
             return report
         failure = verdict.asr_failure()
-        if attempt or failure is None:
+        # A re-render can't fix a whole-file fail, so only a lone ASR fail is worth one.
+        if attempt or failure is None or len(verdict.failures) > 1:
             break
         print(f"publish {name}: re-rendering chunk {failure.chunk} once", file=sys.stderr)
         render.rerender_chunk(args.bundle, args.wav, failure.chunk, args.repo, synthesise)

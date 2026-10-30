@@ -441,3 +441,23 @@ def write_wav(path, samples):
         out.setsampwidth(2)
         out.setframerate(RATE)
         out.writeframes(samples.astype("<i2").tobytes())
+
+
+def test_an_asr_fail_beside_a_whole_file_fail_stops_without_a_re_render(
+    smoke_bundle, tmp_path, capsys
+):
+    engine = render_take(smoke_bundle, tmp_path)
+    chunk = chunk_index(tmp_path, "Air molecules")
+    rendered = len(engine.calls)
+
+    transcribe = heard_as_written(tmp_path / "render.wav", drop={chunk: (2, 8)})
+    code = publish_episode(
+        smoke_bundle, tmp_path, FakeGitHub(), transcribe=transcribe, engine=engine,
+        encode=ffmpeg_encoder("volume=-20dB"),
+    )  # fmt: skip
+
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "asr gate failed" in err and "loudness gate failed" in err
+    assert "re-rendering" not in err
+    assert len(engine.calls) == rendered

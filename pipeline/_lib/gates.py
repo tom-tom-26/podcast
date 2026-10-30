@@ -1,5 +1,5 @@
 """The audio quality gates (research/15), run on the encoded Episode decoded again, so encoding
-faults are caught too. Every fail is firm (owner, 2026-10-29); pace only warns."""
+faults are caught too."""
 
 import difflib
 import json
@@ -23,7 +23,8 @@ LONGEST_SILENCE = 3.0
 LOUDNESS, LOUDNESS_MARGIN = -16.0, 2.0
 TRUE_PEAK = -0.5
 FORMAT = {"codec_name": "aac", "channels": 1, "sample_rate": "44100"}
-PACE_MARGIN = 0.25
+# research/15's pace check, for a Bundle with no wpm budget.
+PACE_WPM, PACE_MARGIN = 165, 0.25
 
 
 @dataclass
@@ -87,7 +88,7 @@ def check_episode(m4a: Path, chunk_map: dict, transcript: str, lexicon: Lexicon,
     heard = spoken_words(transcript)
     matched = _matched(script, heard)
     run, run_start = _longest_miss(matched)
-    tail = len(matched) - len(_rstrip_false(matched))
+    tail = _missing_at_end(matched)
     verdict.measures |= {"missing_run": run, "missing_at_end": tail}
     if run >= MISSING_RUN or tail >= MISSING_AT_END:
         first = run_start if run >= MISSING_RUN else len(script) - tail
@@ -204,11 +205,11 @@ def _longest_miss(matched: list[bool]) -> tuple[int, int]:
     return best, best_start
 
 
-def _rstrip_false(matched: list[bool]) -> list[bool]:
+def _missing_at_end(matched: list[bool]) -> int:
     end = len(matched)
     while end and not matched[end - 1]:
         end -= 1
-    return matched[:end]
+    return len(matched) - end
 
 
 def _asr_report(chunks, matched, lexicon: Lexicon, run: int, tail: int) -> dict:
@@ -255,7 +256,7 @@ def _longest_silence(m4a: Path, duration: float) -> tuple[float, float]:
         elif start is not None:
             longest = max(longest, (start, float(value) - start), key=lambda s: s[1])
             start = None
-    if start is not None:  # silence that runs to the end of the file
+    if start is not None:
         longest = max(longest, (start, duration - start), key=lambda s: s[1])
     return longest
 
