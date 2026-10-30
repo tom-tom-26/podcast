@@ -53,6 +53,14 @@ def break_meta(bundle, old, new):
         ("voice: bm_george", "voice: ''", "voice"),
         ("variant: Quick", "variant: Short", "variant"),
         ("revision: 1", "revision: one", "revision"),
+        ("part: null", "part: {n: 3, of: 2, series_slug: tides}", "part"),
+        ("part: null", "part: {n: 1, of: 4, series_slug: tides}", "part"),
+        ("part: null", "part: {n: 1, of: 2}", "part"),
+        (
+            "parent_episode: null",
+            "parent_episode: ep-007-tides\npart: {n: 1, of: 2, series_slug: tides}",
+            "parent_episode",
+        ),
         ("title: Why", "title: [Why", "meta.yaml"),
     ],
 )
@@ -63,6 +71,12 @@ def test_malformed_meta_blocks(smoke_bundle, old, new, message):
 
     assert run.returncode == 1
     assert message in run.stdout
+
+
+def test_a_part_meta_passes_the_schema(smoke_bundle):
+    break_meta(smoke_bundle, "part: null", "part: {n: 2, of: 3, series_slug: tides}")
+
+    assert "meta.yaml" not in lint(smoke_bundle).stdout
 
 
 def test_malformed_lint_report_blocks(smoke_bundle):
