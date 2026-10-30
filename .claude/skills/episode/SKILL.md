@@ -21,12 +21,13 @@ Read each one when its step comes up, not all at the start.
 | `references/template.md` | Variants, Segments, the host, retrieval design, show notes, metadata | step 1 (Variants), step 3 |
 | `references/tts.md` | Spoken form, capitals and the Lexicon, punctuation, markup | step 3 |
 | `references/deslop.md` | Firm rules F1-F9, the soft checklist, the ten-question self-review | step 3, again at step 4 |
+| `references/learnings.md` | What a lesson is, the line format, Source profile rules, compaction, push conflicts, "Learned this run" | before step 1, again at step 6 |
 
 ## Before step 1
 
 1. `pip install -e .` from the repo root, so `pipeline lint` runs.
 2. `git fetch origin main` and work from `origin/main`.
-3. Read what exists of these, and skip what doesn't: `learnings/INDEX.md`, `learnings/general.md`, the one or two field files the index matches to the Topic, and `config/listener_profile.md`. The Listener profile shapes depth and angle; it never overrides the owner's words in this summon.
+3. Read `learnings/INDEX.md`, `learnings/general.md` and the one or two field files the index matches to the Topic (`references/learnings.md`), and follow the lessons that apply. Read `config/listener_profile.md` if it exists. The Listener profile shapes depth and angle; it never overrides the owner's words in this summon.
 4. Read `config/voices.yaml` for the roster and each voice's `suits:` hints.
 
 ## 1. Confirm
@@ -51,7 +52,7 @@ The owner's reply is final. A tweak ("make it quick", "drop the genetics one", "
 
 Follow `references/accuracy.md`. In short:
 
-- Pick the Source profile for the Topic's field (the overlap rule applies) and climb its source ladder. At least 3 distinct sources, aiming for 5.
+- Use the Source profile in the matched field file (the overlap rule applies), or draft one if none fits (`references/learnings.md`), and climb its source ladder. At least 3 distinct sources, aiming for 5.
 - Write `ledger.md` as you go, one line per claim. Don't write the Script first and source it afterwards.
 - Every number that carries weight is read from raw text (`curl`, `pdftotext`, PubMed's abstract text), never from a WebFetch summary or a search snippet.
 - Decide the Higher-risk flag here, from the profile's triggers. When unsure, flag.
@@ -62,7 +63,7 @@ Fix the Bundle id now: `<today's date>-<slug>`, the slug a few lower-case words 
 
 Write the Script in spoken form, to `references/template.md`, `references/tts.md` and `references/deslop.md`. Then write `show_notes.md` (written form, exact numbers), `meta.yaml` (fields in `references/template.md`), and `lint_report.yaml` holding just `warnings: []`. Lint blocks a Bundle without that file, and fills it in itself.
 
-Write as you go to the Bundle folder, so a lost session leaves the work on disk.
+Write as you go to the Bundle folder, so a lost session leaves the work on disk. When a stage hits a difficulty worth a lesson, note it then; the lessons are written at step 6.
 
 ## 4. Check
 
@@ -85,18 +86,20 @@ If you can't make a Bundle pass, don't push. Say what blocks in the final messag
 
 ## 6. Push
 
-One commit holds the whole run: the Bundle (every Part, for a split Topic) and nothing outside the auto-merge allow-list. A path outside it leaves the PR for the owner.
+One commit holds the whole run: the Bundle (every Part, for a split Topic), this run's Learnings changes, and nothing outside the auto-merge allow-list. A path outside it leaves the PR for the owner.
+
+First write this run's lessons, `seen` raises and any compaction, to `references/learnings.md`. A smooth run changes nothing in `learnings/`.
 
 ```
 git checkout -b claude/<slug> origin/main
-git add bundles/<Bundle id>
+git add bundles/<Bundle id> learnings
 git commit -m "Add the <title> Episode"
 git fetch origin main && git rebase origin/main
 pipeline lint bundles/<Bundle id>
 git push -u origin claude/<slug>
 ```
 
-Lint again after the rebase, since the last ten Bundles on `main` may have moved. For Parts, use the `series_slug` for the branch and add every Part's folder.
+If the rebase stops on a conflict in `learnings/`, follow "Push conflicts" in `references/learnings.md`. Lint again after the rebase, since the last ten Bundles on `main` may have moved. For Parts, use the `series_slug` for the branch and add every Part's folder.
 
 Then open the PR. `gh pr create` fails in a cloud session, because the GitHub proxy blocks GraphQL; the REST API works:
 
@@ -116,6 +119,7 @@ Plain text, short sections, readable on a phone:
 - **Kept warnings**: each one with its reason, or "none".
 - **Choices**: any call you made on an unclear reply, any Source profile you drafted, and any firm default (explain first, an analogy per hard concept) you broke, with the reason.
 - **Left out**: anything the research found but the Episode doesn't say, and why: too weak to voice, off the outline, a source behind a paywall, or something you would not write. When you wrote a safer version than the Topic asked for, say what you left out and why.
+- **Learned this run**: the block in `references/learnings.md`, or "nothing new". Proposed Source profile changes go here too.
 - **Proposed additions**: shared Lexicon entries (each `{term, kokoro, pocket?, by: skill <date>, note}`) and phrase-list additions, for the owner to accept. Don't write them to `config/` yourself.
 - **ETA**: about 10-25 minutes of render after the merge, Pocket voices slower.
 

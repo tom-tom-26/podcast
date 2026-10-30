@@ -5,6 +5,7 @@ A podcast made for one listener. The owner names a topic from their phone, a Cla
 ## Where things live
 
 - `pipeline/`: the Python package that lints scripts, renders audio, publishes Episodes and builds the site.
+- `learnings/`: lessons the Skill writes after a run goes wrong, with what to do instead, and the Source profile for each field of topics.
 - `docs/wayfinder/`: the planning history, including the spec (`spec.md`) and the research behind it.
 - `artwork/`: the Cover, drawn as an SVG. `python artwork/render.py` redraws `cover.png` after `pip install -e ".[artwork]"`.
 - `GLOSSARY.md`: what the words in this repo mean.
