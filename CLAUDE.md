@@ -51,6 +51,8 @@ When a session closes a build ticket (not an Episode run), end its report with:
    - `What it delivers`: one or two lines drawn from the issue's "What to build".
 3. One line naming what to pick up next: the lowest-numbered `ready` issue, plus any other `ready` ones.
 
+Then stop. A session works only the build ticket the owner named and never starts another, even a `ready` one: the owner picks the next ticket from the table and starts it in a new session.
+
 ## Commands
 
 ```
