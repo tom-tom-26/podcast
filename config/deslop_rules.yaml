@@ -1,0 +1,123 @@
+# The de-slop phrase list (research/18 section 9.2, research/05 12.11). Each entry is a
+# case-insensitive regex matched as whole words in the Script, title, summary and show notes.
+# Feedback mode may add phrases; a Bundle records the version it was written against.
+version: 1
+
+# F9, firm: the core ten block a run.
+block:
+  - let'?s dive in
+  - dive deep
+  - delv(e|es|ed|ing)
+  - in today'?s episode
+  - welcome back
+  - without further ado
+  - buckle up
+  - great question
+  - it'?s important to note
+  - it'?s worth noting
+
+# Everything else only warns; the Skill fixes it or keeps it with a reason in lint_report.yaml.
+warn:
+  # P1 openers, closers and fake engagement
+  - dive into
+  - in conclusion
+  - to sum up
+  - in summary
+  - in short,
+  - that'?s a wrap
+  - until next time
+  - stay tuned
+  - thanks for (listening|tuning in)
+  - subscribe
+  - leave a review
+  - rate (us|the show)
+  - let (us|me) know in the comments
+  - see you next (week|time)
+  - link in the (description|show notes)
+  # P2 vocabulary
+  - tapestry
+  - intricac(y|ies)
+  - intricate
+  - underscor(e|es|ed|ing)
+  - pivotal
+  - crucial
+  - paramount
+  - realm
+  - landscape
+  - testament
+  - showcas(e|es|ed|ing)
+  - foster(s|ed|ing)?
+  - leverag(e|es|ed|ing)
+  - navigat(e|es|ing)
+  - robust
+  - seamless(ly)?
+  - multifaceted
+  - nuanced
+  - vibrant
+  - embark
+  - unlock
+  - unleash
+  - supercharge
+  - game[- ]?changer
+  - groundbreaking
+  - revolutioni[sz]e
+  - meticulous(ly)?
+  - palpable
+  - camaraderie
+  - interplay
+  - holistic
+  - synergy
+  - elevate
+  - empower
+  - boasts?
+  - nestled
+  - ever[- ]evolving
+  - in the heart of
+  - plethora
+  - myriad
+  - hack
+  - biohack
+  - secret
+  - life[- ]changing
+  - treasure trove
+  - beacon
+  - journey
+  - science says
+  - consult a healthcare professional
+  # P3 constructions
+  - (serves|stands|acts) as (a|an|the)
+  - plays an? (crucial|key|pivotal|vital|significant|important) role
+  - a (testament|reminder) (to|of)
+  - it'?s (important|worth) (to note|noting|mentioning|remembering)
+  - not (just|only|merely) [^.]{1,60}but( also)?
+  - it'?s not [^.]{1,50}[,.] it'?s
+  - ', (highlighting|underscoring|emphasi[sz]ing|showcasing|reflecting|ensuring|fostering|illustrating)'
+  - the (truth|reality) is
+  - at the end of the day
+  - let that sink in
+  - make no mistake
+  - the bottom line is
+  - here'?s the (kicker|catch)
+  - when it comes to
+  - despite (these|the) challenges
+  - the future (looks|is) bright
+  - only time will tell
+  - (studies|research|experts|scientists) (show|shows|say|suggest|agree|confirm)
+  - some (people|experts|critics|researchers) (say|argue|believe|claim)
+  - (good|excellent|fantastic) question
+  - fascinating|amazing|incredible|mind-blowing
+  - (ultimately,? )?it (all )?depends
+  - pros and cons
+  - when i (first )?(tried|started|did)
+  - i remember (when|the first)
+  - my (clients|listeners|patients|friends)
+  # P4 meta-talk
+  - in this (section|segment|part|episode),? (we|i)('ll| will)
+  - as (we|i) (mentioned|discussed|said|saw) (earlier|before|above)
+  - now,? let'?s (turn|move|look|talk|shift)
+  - let'?s (take a (closer )?look|explore|unpack|break (it|this) down)
+  - first and foremost
+
+# P5, show notes only.
+show_notes:
+  - key takeaways?

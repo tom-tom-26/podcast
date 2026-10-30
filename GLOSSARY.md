@@ -69,3 +69,5 @@
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).
 
 **Topic backlog**: The owner's list of topics for later Episodes (`config/backlog.md`). Only the owner adds to it, by hand or through the Skill; summoning with "next" takes the top line. The Skill never suggests topics on its own.
+
+**Phrase list**: The versioned de-slop list in `config/deslop_rules.yaml`: the core ten phrases that block a Bundle (F9), and the rest, which only warn. Feedback mode may add to it; a Bundle records the `deslop_version` it was written against.
