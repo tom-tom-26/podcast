@@ -4,7 +4,7 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize("entry_point", ["lint", "render", "publish", "site", "report"])
+@pytest.mark.parametrize("entry_point", ["lint", "render", "publish", "site", "report", "merge"])
 def test_entry_point_runs_from_the_command_line(entry_point):
     run = subprocess.run(
         [sys.executable, "-m", "pipeline", entry_point, "--help"],

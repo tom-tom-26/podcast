@@ -89,3 +89,11 @@
 **Topic backlog**: The owner's list of topics for later Episodes (`config/backlog.md`). Only the owner adds to it, by hand or through the Skill; summoning with "next" takes the top line. The Skill never suggests topics on its own.
 
 **Phrase list**: The versioned de-slop list in `config/deslop_rules.yaml`: the core ten phrases that block a Bundle (F9), and the rest, which only warn. Feedback mode may add to it; a Bundle records the `deslop_version` it was written against.
+
+**Pin list**: `pinned.txt`, one Episode id per line, kept in the Window whatever their age and counted against its budget. "Bring back episode X" adds a line (ticket 08).
+
+**Template tunables**: `config/template.yaml`, the Episode template's numbers the owner can change by instruction: Variant ranges, typical Standard length, the wpm budget and the like, versioned by `style_guide_version`.
+
+**Owner-instructed**: A Feedback-mode commit that carries out an instruction the owner gave, marked by a trailer line quoting the owner's words, `Owner-instructed: "make them shorter"`. Only such a commit may auto-merge a change to the Template tunables or the Voice roster.
+
+**Auto-merge**: The workflow that merges a Skill's `claude/` branch PR when every changed path is allowed and lint finds no firm failure, then dispatches the workflow the change needs. Anything else stays open, labelled `needs-owner`.

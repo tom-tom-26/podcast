@@ -31,4 +31,6 @@ Before anything goes up, `publish` checks the encoded audio: a speech-recognitio
 
 On GitHub, run the publish-episode workflow with a Bundle id: with `dry_run` you get the `.m4a` and its ASR report as a workflow artifact; without it the Episode goes up as a Release, is added to `episodes.yaml` (the Episode registry), and the deploy-site workflow rebuilds the Pages site from the registry, `config/show.yaml` and the Releases. Run deploy-site by hand to redeploy. If any audio can't be fetched or a check fails, nothing is deployed and the last good site stays up.
 
-A failed run of either workflow opens one issue labelled `pipeline-failure`, naming the stage, the Bundle and the last log lines. A run that succeeds says nothing.
+The Skill pushes each Bundle on a `claude/` branch and opens a PR. The auto-merge workflow lints it and squash-merges it if it only touches Bundles, Learnings, the pin list, the Listener profile, the backlog, the lexicon or the phrase list (the Template tunables and the voice roster too, on a commit with an `Owner-instructed: "..."` line quoting the owner). It then starts publish-episode for a new Bundle, or deploy-site for a pin-list change. Anything else stays open, labelled `needs-owner`, with a comment saying why.
+
+A failed run of any of these workflows opens one issue labelled `pipeline-failure`, naming the stage, the Bundle and the last log lines. A run that succeeds says nothing.

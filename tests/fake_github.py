@@ -18,6 +18,11 @@ class FakeGitHub:
         self.jobs = []
         self.logs = {}  # job id -> log text
         self.issues = []
+        self.pulls = {}  # number -> {"head": ref, "sha": sha, "files": [...], "messages": [...]}
+        self.labels = {}  # issue or PR number -> labels added
+        self.comments = {}  # issue or PR number -> comment bodies
+        self.merged = {}  # PR number -> the head sha it was merged at
+        self.dispatches = []  # (workflow file, inputs)
 
     def read_file(self, path):
         self.calls.append("read_file")
@@ -81,3 +86,33 @@ class FakeGitHub:
         self.calls.append("open_issue")
         self.issues.append({"title": title, "body": body, "labels": labels, "assignees": assignees})
         return f"https://github.com/{self.repo}/issues/{len(self.issues)}"
+
+    def pull_request(self, number):
+        self.calls.append("pull_request")
+        pull = self.pulls[number]
+        return {"head": {"ref": pull["head"], "sha": pull["sha"]}, "state": "open"}
+
+    def pull_files(self, number):
+        self.calls.append("pull_files")
+        return self.pulls[number]["files"]
+
+    def pull_commit_messages(self, number):
+        self.calls.append("pull_commit_messages")
+        return self.pulls[number]["messages"]
+
+    def add_labels(self, number, labels):
+        self.calls.append("add_labels")
+        self.labels.setdefault(number, []).extend(labels)
+
+    def comment(self, number, body):
+        self.calls.append("comment")
+        self.comments.setdefault(number, []).append(body)
+
+    def squash_merge(self, number, sha):
+        self.calls.append("squash_merge")
+        assert sha == self.pulls[number]["sha"], "merged a head the decision never saw"
+        self.merged[number] = sha
+
+    def dispatch(self, workflow, inputs):
+        self.calls.append("dispatch")
+        self.dispatches.append((workflow, inputs))
