@@ -56,6 +56,35 @@ def ledger_ids(ledger: str) -> set[str]:
     return {line.split("|", 1)[0].strip() for line in ledger.splitlines() if "|" in line}
 
 
+LEDGER_FIELDS = 7
+READ_DEPTHS = {"full text", "abstract", "secondary"}
+
+
+def ledger_warnings(ledger: str) -> list[str]:
+    """Ledger lines not in the shape `id | claim | source | tier | read depth | n and
+    population | tags`. The claim-check and the firm number rule both lean on tier and read
+    depth, so a line missing them is worth fixing, though only a broken Claim tag blocks."""
+    warnings = []
+    for line in ledger.splitlines():
+        if "|" not in line:
+            continue
+        fields = [field.strip() for field in line.split("|")]
+        where = f"ledger.md, {fields[0]}"
+        if len(fields) != LEDGER_FIELDS:
+            warnings.append(
+                f"{where}: {len(fields)} fields, not 7 (id | claim | source | tier | "
+                "read depth | n and population | tags)"
+            )
+            continue
+        if fields[3] not in {"1", "2", "3", "4"}:
+            warnings.append(f"{where}: tier {fields[3]!r} is not 1 to 4")
+        if fields[4] not in READ_DEPTHS:
+            warnings.append(
+                f"{where}: read depth {fields[4]!r} is not full text, abstract or secondary"
+            )
+    return warnings
+
+
 def parent_ledger(bundle: Path, repo: Path, parent_episode: str) -> set[str] | str:
     """A Q&A parent's ledger ids, found through the Episode registry, or why it can't be read.
     The parent Bundle sits beside this one."""

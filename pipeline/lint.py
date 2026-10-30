@@ -13,6 +13,7 @@ from pipeline._lib.lexicon import load_lexicon, phonemize
 from pipeline._lib.rules import (
     claim_problems,
     ledger_ids,
+    ledger_warnings,
     pace_warnings,
     parent_ledger,
     phrase_findings,
@@ -83,6 +84,7 @@ def main(args: argparse.Namespace) -> int:
                 parent = set()
         if "ledger.md" in texts:
             problems += claim_problems(script, ledger_ids(texts["ledger.md"]), parent)
+            warnings += ledger_warnings(texts["ledger.md"])
         try:
             segments = parse_script(script)
         except ScriptError:

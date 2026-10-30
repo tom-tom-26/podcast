@@ -28,6 +28,10 @@
 
 **Listener profile**: The short file (`config/listener_profile.md`) recording the owner's taste, as shown by their Q&A questions and their feedback on Episodes: how much detail they want, where their curiosity goes, and how Episodes land. Read by every run; any default change it suggests needs the owner's OK (tickets 11 and 16).
 
+**Read depth**: How much of a source the Skill actually read for a Claim ledger line: `full text`, `abstract`, or `secondary` (any summary, including a WebFetch result or a search snippet). A number spoken in a Script needs a full text, or an abstract that states it (ticket 06).
+
+**Confirm message**: The Skill's one message before it starts work, with the Variant, outline, voice, and any drill-down options or Part split. The owner answers it in one reply, "go" or a tweak, and is asked nothing else.
+
 **Variant**: The length format of an Episode, proposed by the Skill and confirmed by the owner: Quick (8-15 min), Standard (15-28 min, default, typically ~25) or Deep (28-35 min). Ranges are ceilings; there is no minimum.
 
 **Segment**: A titled section of a Script: Hook, Roadmap, a content segment, the closing segment (Protocol, or Why it matters / what to watch), Recap, Sign-off.

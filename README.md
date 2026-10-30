@@ -9,6 +9,20 @@ A podcast made for one listener. The owner names a topic from their phone, a Cla
 - `artwork/`: the Cover, drawn as an SVG. `python artwork/render.py` redraws `cover.png` after `pip install -e ".[artwork]"`.
 - `GLOSSARY.md`: what the words in this repo mean.
 
+## Making an Episode
+
+Open the Code tab of the Claude iPhone app, start a session on this repo in the `podcast` environment, and name a Topic. The `episode` Skill (`.claude/skills/episode/`) replies with one confirm message; reply "go" or adjust it. It researches, writes the Bundle, lints it, and pushes it on a `claude/` branch with a PR.
+
+Set up once, at claude.ai/code:
+
+- Connect GitHub through the Claude GitHub App. Pushes and the PR go through Anthropic's GitHub proxy, so the session holds no token and the repo has no secret for it.
+- Add an environment named `podcast` with **Network access: Full**. The default Trusted level blocks journals, PubMed and news sites, which the research needs.
+- Give it this setup script, for reading PDFs as raw text:
+
+  ```
+  apt-get update && apt-get install -y poppler-utils || true
+  ```
+
 ## Running it
 
 ```
