@@ -68,6 +68,10 @@
 
 **Chunk**: One stretch of a Script sent to the TTS engine in a single call. A chunk never crosses a paragraph, `[beat]`, `[think]` or Segment heading.
 
+**Pacing config**: `config/pacing.yaml`, how render cuts a Script into chunks and spaces them: the chunk cap, the gap drawn at each kind of boundary, the `[beat]` and `[think]` lengths, speed jitter and trim. Draws are seeded by the Bundle id.
+
+**Chunk map**: The file render writes beside its WAV, naming each chunk's Segment, text, speed and place in the WAV, so a later stage can name a chunk or re-render it.
+
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).

@@ -3,3 +3,5 @@
 voices:
   bm_george:
     engine: kokoro
+    # Base speed for about 165 wpm with long chunks; the pacing config's jitter goes on top.
+    speed: 1.07

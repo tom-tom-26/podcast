@@ -14,12 +14,12 @@ class Phonemes(str):
     """Kokoro input the Lexicon has already phonemized, so Kokoro mustn't phonemize it again."""
 
 
-def synthesise(text: str, voice: str) -> np.ndarray:
-    """Speak text in a voice: float32 samples at 24 kHz."""
+def synthesise(text: str, voice: str, speed: float) -> np.ndarray:
+    """Speak text in a voice at a speed (1 is the engine's own pace): float32 samples at 24 kHz."""
     samples, rate = _kokoro().create(
         text,
         voice=voice,
-        speed=1.0,
+        speed=speed,
         lang=kokoro_lang(voice),
         is_phonemes=isinstance(text, Phonemes),
     )
