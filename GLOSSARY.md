@@ -76,6 +76,10 @@
 
 **Chunk map**: The file render writes beside its WAV, naming the voice and each chunk's Segment, text, speed (a Kokoro speed or a Pocket stretch), Pocket seed and place in the WAV, so a later stage can name a chunk or re-render it.
 
+**Gate**: One of publish's firm checks on the encoded Episode, decoded again: the ASR round trip, silence, loudness, true peak and format (research/15). A fail stops the run before the Release; an ASR fail first re-renders the chunk it names, once.
+
+**ASR report**: `asr_report.yaml`, a Release asset beside the audio, recording for each capitals word and Lexicon term in the Script whether the ASR round trip heard it as written. Weak evidence the Skill weighs before proposing a `verified:` addition.
+
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).

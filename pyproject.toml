@@ -17,6 +17,8 @@ dependencies = [
 kokoro = ["kokoro-onnx==0.6.1"]
 # Pulls in PyTorch; install it from the CPU wheel index, or pip fetches the CUDA build.
 pocket = ["pocket-tts==4.0.1", "audiotsm==0.1.2"]
+# The ASR gate's speech recogniser; the tests fake it, so only publish-episode installs it.
+asr = ["faster-whisper==1.2.1"]
 # Only for redrawing the cover; the Pipeline reads the committed PNG.
 artwork = ["pillow>=11", "resvg-py==0.5.0"]
 dev = [
