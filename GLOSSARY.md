@@ -50,7 +50,7 @@
 
 **Source profile**: For one field of topics, what counts as strong evidence, what to watch for, and what triggers the Higher-risk flag. Starter set in research/05 section 13; new ones are saved to Learnings.
 
-**Bundle id**: The name of a Bundle's folder, `<date>-<slug>`, fixed when the Skill writes it. Seeds the render's random pauses, so a re-render sounds the same.
+**Bundle id**: The name of a Bundle's folder, `<date>-<slug>`, fixed when the Skill writes it. Seeds the render's random draws, each chunk's with its own text, so a re-render sounds the same wherever the Script didn't change.
 
 **Episode id**: The published name of an Episode, `ep-007-<slug>` (Parts `ep-004a-...`), given by the Pipeline at publish time in publish order. Used for the Release tag and file name.
 
@@ -95,6 +95,8 @@
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).
 
 **Correction**: A fix to a published Episode's content, graded Harmful, Material or Minor. Harmful and Material re-render the Episode under the same guid; every Correction leaves a dated line in the Show notes (ticket 16).
+
+**Re-render**: Publishing a published Episode again from its corrected Bundle, as `-v2.m4a` (then `-v3`) in the same Release. The old file stays, the guid and Episode number never change, and the Episode registry entry moves to the new file. Auto-merge starts one when a published Bundle's `revision` rises.
 
 **Topic backlog**: The owner's list of topics for later Episodes (`config/backlog.md`). Only the owner adds to it, by hand or through the Skill; summoning with "next" takes the top line. The Skill never suggests topics on its own.
 

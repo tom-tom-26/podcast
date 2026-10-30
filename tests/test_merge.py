@@ -12,6 +12,7 @@ from tests.fake_github import FakeGitHub
 REPO = Path(__file__).parent.parent
 
 TIDES = "bundles/2026-11-02-tides"
+PUBLISHED = {"2026-11-02-tides": "ep-002-tides"}
 
 
 def new_bundle(path=TIDES):
@@ -19,7 +20,7 @@ def new_bundle(path=TIDES):
 
 
 def test_a_new_bundle_merges_and_dispatches_publish_episode():
-    decision = decide(new_bundle(), "Add the tides Bundle", published=set())
+    decision = decide(new_bundle(), "Add the tides Bundle", published={})
 
     assert decision.refusals == []
     assert decision.lint == ["2026-11-02-tides"]
@@ -29,7 +30,7 @@ def test_a_new_bundle_merges_and_dispatches_publish_episode():
 
 def test_a_change_to_pipeline_code_needs_the_owner():
     decision = decide(
-        new_bundle() + [("modified", "pipeline/render.py")], "Add tides", published=set()
+        new_bundle() + [("modified", "pipeline/render.py")], "Add tides", published={}
     )
 
     assert decision.refusals == ["pipeline/render.py is not on the auto-merge allow-list"]
@@ -49,7 +50,7 @@ def test_a_change_to_pipeline_code_needs_the_owner():
     ],
 )
 def test_data_the_skill_writes_merges_without_the_owner(path):
-    decision = decide([("modified", path)], "Log feedback on Episode 7", published=set())
+    decision = decide([("modified", path)], "Log feedback on Episode 7", published={})
 
     assert decision.refusals == []
 
@@ -58,13 +59,13 @@ def test_data_the_skill_writes_merges_without_the_owner(path):
     "path", [f"{TIDES}/tides.m4a", f"{TIDES}/notes/extra.md", "bundles/tides/script.md"]
 )
 def test_a_file_that_is_not_part_of_a_bundle_needs_the_owner(path):
-    decision = decide(new_bundle() + [("added", path)], "Add tides", published=set())
+    decision = decide(new_bundle() + [("added", path)], "Add tides", published={})
 
     assert decision.refusals == [f"{path} is not on the auto-merge allow-list"]
 
 
 def test_deleting_a_file_needs_the_owner():
-    decision = decide([("removed", f"{TIDES}/show_notes.md")], "Tidy up", published=set())
+    decision = decide([("removed", f"{TIDES}/show_notes.md")], "Tidy up", published={})
 
     assert decision.refusals == [f"{TIDES}/show_notes.md is deleted, which only the owner does"]
 
@@ -76,7 +77,7 @@ INSTRUCTED = (
 
 @pytest.mark.parametrize("path", ["config/template.yaml", "config/voices.yaml"])
 def test_tunables_and_the_voice_roster_merge_on_an_owner_instructed_commit(path):
-    decision = decide([("modified", path)], INSTRUCTED, published=set())
+    decision = decide([("modified", path)], INSTRUCTED, published={})
 
     assert decision.refusals == []
 
@@ -93,7 +94,7 @@ def test_tunables_and_the_voice_roster_merge_on_an_owner_instructed_commit(path)
     ],
 )
 def test_tunables_need_the_owner_without_a_quoted_instruction(message):
-    decision = decide([("modified", "config/template.yaml")], message, published=set())
+    decision = decide([("modified", "config/template.yaml")], message, published={})
 
     assert decision.refusals == [
         "config/template.yaml changes only on a commit marked Owner-instructed that quotes "
@@ -104,13 +105,13 @@ def test_tunables_need_the_owner_without_a_quoted_instruction(message):
 def test_an_instruction_quoted_on_an_iphone_counts():
     message = "Slow bm_lewis down\n\nOwner-instructed: “slower please”\n"
 
-    decision = decide([("modified", "config/voices.yaml")], message, published=set())
+    decision = decide([("modified", "config/voices.yaml")], message, published={})
 
     assert decision.refusals == []
 
 
 def test_a_pin_list_change_dispatches_deploy_site():
-    decision = decide([("modified", "pinned.txt")], "Bring back Episode 3", published=set())
+    decision = decide([("modified", "pinned.txt")], "Bring back Episode 3", published={})
 
     assert decision.publish == []
     assert decision.deploy is True
@@ -120,7 +121,7 @@ def test_a_new_bundle_with_a_pin_list_change_only_publishes():
     # publish-episode dispatches deploy-site itself once the Episode is out.
     changes = new_bundle() + [("modified", "pinned.txt")]
 
-    decision = decide(changes, "Add tides", published=set())
+    decision = decide(changes, "Add tides", published={})
 
     assert decision.publish == ["2026-11-02-tides"]
     assert decision.deploy is False
@@ -128,7 +129,7 @@ def test_a_new_bundle_with_a_pin_list_change_only_publishes():
 
 def test_an_edit_to_a_published_bundle_is_linted_but_publishes_nothing():
     decision = decide(
-        [("modified", f"{TIDES}/ledger.md")], "Fix a ledger tier", published={"2026-11-02-tides"}
+        [("modified", f"{TIDES}/ledger.md")], "Fix a ledger tier", published=PUBLISHED
     )
 
     assert decision.lint == ["2026-11-02-tides"]
@@ -136,17 +137,71 @@ def test_an_edit_to_a_published_bundle_is_linted_but_publishes_nothing():
     assert decision.deploy is False
 
 
-def test_learnings_alone_dispatch_nothing():
-    decision = decide([("added", "learnings/general.md")], "Learn", published=set())
+def test_a_revision_bump_of_a_published_bundle_dispatches_a_re_render():
+    changes = [("modified", f"{TIDES}/{file}") for file in ("script.md", "meta.yaml")]
 
-    assert decision == decide([], "", published=set())
+    decision = decide(changes, "Correct Episode 2", PUBLISHED, {"2026-11-02-tides": (1, 2)})
+
+    assert decision.rerender == ["ep-002-tides"]
+    assert decision.publish == []
+    assert decision.deploy is False
+
+
+def test_a_show_notes_only_change_to_a_published_bundle_dispatches_deploy_site():
+    changes = [("modified", f"{TIDES}/show_notes.md")]
+
+    decision = decide(changes, "Note a Minor Correction", PUBLISHED, {"2026-11-02-tides": (1, 1)})
+
+    assert decision.deploy is True
+    assert decision.rerender == [] and decision.publish == []
+
+
+def test_a_published_script_changed_without_a_revision_bump_needs_the_owner():
+    changes = [("modified", f"{TIDES}/script.md")]
+
+    decision = decide(changes, "Reword a line", PUBLISHED, {"2026-11-02-tides": (1, 1)})
+
+    assert decision.refusals == [
+        f"{TIDES}/script.md changed but revision stayed 1, so the published audio would no "
+        "longer match it; bump revision to re-render"
+    ]
+    assert decision.rerender == [] and decision.deploy is False
+
+
+def test_a_revision_that_goes_down_needs_the_owner():
+    changes = [("modified", f"{TIDES}/meta.yaml")]
+
+    decision = decide(changes, "Undo", PUBLISHED, {"2026-11-02-tides": (3, 2)})
+
+    assert decision.refusals == [
+        f"{TIDES}/meta.yaml takes revision from 3 down to 2; a revision only rises"
+    ]
+    assert decision.rerender == [] and decision.deploy is False
+
+
+def test_a_new_bundle_and_a_re_render_in_one_pr_need_the_owner():
+    changes = new_bundle("bundles/2026-11-09-moon") + [("modified", f"{TIDES}/meta.yaml")]
+
+    decision = decide(changes, "Add moon, correct tides", PUBLISHED, {"2026-11-02-tides": (1, 2)})
+
+    assert decision.refusals == [
+        "2026-11-09-moon is new and ep-002-tides re-renders; each needs a PR of its own, since "
+        "a third run queued in the publish group cancels the one already waiting"
+    ]
+    assert decision.publish == [] and decision.rerender == []
+
+
+def test_learnings_alone_dispatch_nothing():
+    decision = decide([("added", "learnings/general.md")], "Learn", published={})
+
+    assert decision == decide([], "", published={})
     assert decision.publish == [] and decision.deploy is False
 
 
 def test_a_refused_change_dispatches_nothing():
     changes = [("modified", "pinned.txt"), ("modified", ".github/workflows/ci.yml")]
 
-    decision = decide(changes, "Pin and tweak", published=set())
+    decision = decide(changes, "Pin and tweak", published={})
 
     assert decision.refusals
     assert decision.deploy is False
@@ -228,6 +283,17 @@ def test_a_firm_lint_failure_leaves_the_pr_open_for_the_owner(branch):
 
 def test_a_bundle_already_in_the_registry_on_main_is_not_published_again(branch):
     github = FakeGitHub()
+    published_tides(github, branch)
+    tides_pr(github, [{"status": "modified", "filename": f"{TIDES}/ledger.md"}])
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {12: "abc123"}
+    assert github.dispatches == []
+
+
+def published_tides(github, branch, revision_on_main=1):
+    """Main's registry and Bundle as they are once tides is out as Episode 2."""
     github.files["episodes.yaml"] = yaml.safe_dump(
         {
             "episodes": [
@@ -235,12 +301,39 @@ def test_a_bundle_already_in_the_registry_on_main_is_not_published_again(branch)
             ]
         }
     )
-    tides_pr(github, [{"status": "modified", "filename": f"{TIDES}/ledger.md"}])
+    meta = yaml.safe_load((branch / TIDES / "meta.yaml").read_text(encoding="utf-8"))
+    github.files[f"{TIDES}/meta.yaml"] = yaml.safe_dump({**meta, "revision": revision_on_main})
+
+
+def test_a_revision_bump_merges_and_dispatches_publish_episode_in_re_render_mode(branch):
+    github = FakeGitHub()
+    published_tides(github, branch)
+    meta_path = branch / TIDES / "meta.yaml"
+    meta = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+    meta_path.write_text(yaml.safe_dump({**meta, "revision": 2}), encoding="utf-8")
+    files = ["script.md", "meta.yaml", "show_notes.md", "ledger.md"]
+    tides_pr(github, [{"status": "modified", "filename": f"{TIDES}/{file}"} for file in files])
 
     assert run_merge(github, branch) == 0
 
     assert github.merged == {12: "abc123"}
-    assert github.dispatches == []
+    assert github.dispatches == [
+        (
+            "publish-episode.yml",
+            {"bundle": "ep-002-tides", "dry_run": "false", "rerender": "true"},
+        )
+    ]
+
+
+def test_a_show_notes_only_change_merges_and_redeploys_the_site(branch):
+    github = FakeGitHub()
+    published_tides(github, branch)
+    tides_pr(github, [{"status": "modified", "filename": f"{TIDES}/show_notes.md"}])
+
+    assert run_merge(github, branch) == 0
+
+    assert github.merged == {12: "abc123"}
+    assert github.dispatches == [("deploy-site.yml", {})]
 
 
 def test_a_pin_list_change_redeploys_the_site(branch):

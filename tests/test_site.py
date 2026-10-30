@@ -400,6 +400,48 @@ def test_a_pin_on_one_part_keeps_the_whole_topic(repo, tmp_path):
     ]
 
 
+def test_a_re_render_in_the_window_moves_the_enclosure_and_keeps_the_guid(repo, tmp_path):
+    root, github = repo
+    v2 = rerender(root, github, "ep-001-smoke", seconds=5)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    [item] = [i for i in feed(out).iter("item") if i.findtext("guid").endswith("01")]
+    enclosure = item.find("enclosure")
+    assert enclosure.get("url") == f"{BASE_URL}/audio/ep-001-smoke-v2.m4a"
+    assert enclosure.get("length") == str(v2.stat().st_size)
+    assert item.findtext("guid") == "00000000-0000-4000-8000-000000000001"
+    assert (out / "audio" / "ep-001-smoke-v2.m4a").read_bytes() == v2.read_bytes()
+    assert not (out / "audio" / "ep-001-smoke.m4a").exists()
+
+
+def test_a_re_render_outside_the_window_changes_the_archive_but_not_the_feed(repo, tmp_path):
+    root, github = repo
+    set_site(root, budget_mb=size_mb(root, "ep-002-tides"))
+    rerender(root, github, "ep-001-smoke", seconds=5)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    assert titles(out) == ["Episode 2: How tides work"]
+    page = (out / "archive.html").read_text(encoding="utf-8")
+    assert "releases/download/ep-001-smoke/ep-001-smoke-v2.m4a" in page
+
+
+def test_a_pinned_re_render_outside_the_budget_reaches_the_feed(repo, tmp_path):
+    root, github = repo
+    set_site(root, budget_mb=size_mb(root, "ep-002-tides"))
+    pin(root, "ep-001-smoke")
+    rerender(root, github, "ep-001-smoke", seconds=5)
+    out = tmp_path / "_site"
+
+    assert build_site(root, out, github) == 0
+
+    urls = [i.find("enclosure").get("url") for i in feed(out).iter("item")]
+    assert f"{BASE_URL}/audio/ep-001-smoke-v2.m4a" in urls
+
+
 def test_the_repoint_switch_is_off_by_default():
     rules = yaml.safe_load((REPO / "config" / "site.yaml").read_text(encoding="utf-8"))
 
@@ -608,6 +650,20 @@ def add_episode(root, github, number, episode_id, published_at):
         }
     )
     write_registry(root, episodes)
+
+
+def rerender(root, github, episode_id, seconds):
+    """Re-render an Episode as publish does: a -v2 file beside the first in its Release, and
+    the registry entry moved to it."""
+    audio = tone_m4a(root.parent / "releases" / f"{episode_id}-v2.m4a", seconds)
+    github.releases[episode_id]["assets"][audio.name] = audio.stat().st_size
+    github.audio[episode_id, audio.name] = audio.read_bytes()
+    episodes = registry(root)
+    for episode in episodes:
+        if episode["episode_id"] == episode_id:
+            episode.update(file=audio.name, bytes=audio.stat().st_size, duration=seconds)
+    write_registry(root, episodes)
+    return audio
 
 
 def pin(root, episode_id):

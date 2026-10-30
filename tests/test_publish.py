@@ -182,6 +182,97 @@ def test_a_byte_size_mismatch_fails_with_no_registry_commit(smoke_bundle, tmp_pa
     assert registry(github) == []
 
 
+def correct(bundle, line="Corrected 2026-11-03: an earlier version said violet. That was wrong."):
+    """A Correction as Feedback mode leaves it: a dated show-notes line and a revision bump."""
+    notes = bundle / "show_notes.md"
+    notes.write_text(f"{line}\n\n{notes.read_text(encoding='utf-8')}", encoding="utf-8")
+    meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
+    meta["revision"] += 1
+    (bundle / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
+
+
+def test_a_re_render_writes_v2_into_the_same_release_and_keeps_the_guid(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    publish_episode(smoke_bundle, tmp_path, github)
+    [first] = registry(github)
+    correct(smoke_bundle)
+
+    assert publish_episode(smoke_bundle, tmp_path, github, "--rerender") == 0
+
+    v2 = tmp_path / "out" / "ep-001-smoke-v2.m4a"
+    [entry] = registry(github)
+    assert entry == {
+        **first,
+        "file": "ep-001-smoke-v2.m4a",
+        "bytes": v2.stat().st_size,
+        "duration": round(float(ffprobe(v2)["format"]["duration"])),
+    }
+    release = github.releases["ep-001-smoke"]
+    assert release["assets"].keys() == {
+        "ep-001-smoke.m4a",
+        "asr_report.yaml",
+        "ep-001-smoke-v2.m4a",
+        "asr_report-v2.yaml",
+    }
+    assert release["title"] == "Episode 1: Why the sky is blue"
+    assert release["notes"].startswith("Corrected 2026-11-03: an earlier version said violet.")
+    assert not release["draft"]
+    assert github.commits[-1] == ("episodes.yaml", "Re-render ep-001-smoke as v2")
+
+
+def test_a_second_re_render_writes_v3_and_keeps_every_earlier_file(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    publish_episode(smoke_bundle, tmp_path, github)
+    for _ in range(2):
+        correct(smoke_bundle)
+        assert publish_episode(smoke_bundle, tmp_path, github, "--rerender") == 0
+
+    assert registry(github)[0]["file"] == "ep-001-smoke-v3.m4a"
+    assert {"ep-001-smoke.m4a", "ep-001-smoke-v2.m4a", "ep-001-smoke-v3.m4a"} <= set(
+        github.releases["ep-001-smoke"]["assets"]
+    )
+
+
+def test_a_re_render_byte_size_mismatch_leaves_the_registry_on_the_old_file(
+    smoke_bundle, tmp_path, capsys
+):
+    github = FakeGitHub()
+    publish_episode(smoke_bundle, tmp_path, github)
+    before = github.files["episodes.yaml"]
+    correct(smoke_bundle)
+    github.upload_loses_bytes = 1
+
+    assert publish_episode(smoke_bundle, tmp_path, github, "--rerender") == 1
+
+    assert "ep-001-smoke-v2.m4a" in capsys.readouterr().err
+    assert github.files["episodes.yaml"] == before
+    assert "Corrected" not in github.releases["ep-001-smoke"]["notes"]
+
+
+def test_a_re_render_after_a_failed_one_takes_the_next_free_version(smoke_bundle, tmp_path):
+    github = FakeGitHub()
+    publish_episode(smoke_bundle, tmp_path, github)
+    correct(smoke_bundle)
+    github.upload_loses_bytes = 1
+    publish_episode(smoke_bundle, tmp_path, github, "--rerender")
+    github.upload_loses_bytes = 0
+
+    assert publish_episode(smoke_bundle, tmp_path, github, "--rerender") == 0
+
+    assert registry(github)[0]["file"] == "ep-001-smoke-v3.m4a"
+
+
+def test_a_bundle_never_published_is_not_re_rendered(smoke_bundle, tmp_path, capsys):
+    github = FakeGitHub()
+
+    assert publish_episode(smoke_bundle, tmp_path, github, "--rerender") == 1
+
+    assert "2026-10-30-smoke is not published, so there is nothing to re-render" in (
+        capsys.readouterr().err
+    )
+    assert github.releases == {} and github.commits == []
+
+
 def test_a_folder_that_is_not_a_bundle_id_is_refused(smoke_bundle, tmp_path, capsys):
     github = FakeGitHub()
     renamed = smoke_bundle.rename(smoke_bundle.parent / "smoke")

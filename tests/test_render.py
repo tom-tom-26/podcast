@@ -122,6 +122,37 @@ def test_a_different_bundle_id_renders_different_timing(smoke_bundle, tmp_path):
     assert silences(read_samples(first)) != silences(read_samples(second))
 
 
+@pytest.mark.parametrize("voice", ["bm_george", "charles"])
+def test_a_corrected_script_re_renders_its_unchanged_passages_the_same(
+    smoke_bundle, tmp_path, voice
+):
+    first, _ = render_smoke(in_voice(smoke_bundle, voice), tmp_path / "first")
+    # A Correction rewrites one passage near the start, adding a chunk ahead of the rest.
+    script = smoke_bundle / "script.md"
+    text = script.read_text(encoding="utf-8")
+    edited = "In the next minute, one idea explains it. The same idea explains red sunsets."
+    script.write_text(
+        text.replace(
+            "In the next minute, one idea explains it, and the same idea explains red sunsets.",
+            f"{edited}\n\nThis version corrects what an earlier one said about sunsets.",
+        ),
+        encoding="utf-8",
+    )
+    second, _ = render_smoke(smoke_bundle, tmp_path / "second")
+
+    before, after = takes(first), takes(second)
+    unchanged = [text for text in before if text in after]
+    assert len(after) == len(before) + 1
+    assert len(unchanged) == len(before) - 1
+    assert all(before[text] == after[text] for text in unchanged)
+
+
+def takes(engine):
+    """Each chunk's text, with the speed and seed it was read at."""
+    texts = [text for text, _ in engine.calls]
+    return dict(zip(texts, zip(engine.speeds, engine.seeds, strict=True), strict=True))
+
+
 def read_samples(wav):
     with wave.open(str(wav)) as audio:
         return np.frombuffer(audio.readframes(audio.getnframes()), dtype=np.int16)

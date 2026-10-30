@@ -42,12 +42,23 @@ class FakeGitHub:
 
     def upload_asset(self, release_id, file):
         self.calls.append("upload_asset")
+        assets = self.releases[release_id]["assets"]
+        assert file.name not in assets, f"GitHub refuses a second asset named {file.name}"
         size = file.stat().st_size - self.upload_loses_bytes
         self.releases[release_id]["assets"][file.name] = size
 
     def asset_sizes(self, release_id):
         self.calls.append("asset_sizes")
         return dict(self.releases[release_id]["assets"])
+
+    def release_id(self, tag):
+        self.calls.append("release_id")
+        assert tag in self.releases, f"no Release {tag}"
+        return tag
+
+    def update_release(self, release_id, title, notes):
+        self.calls.append("update_release")
+        self.releases[release_id].update(title=title, notes=notes)
 
     def publish_release(self, release_id):
         self.calls.append("publish_release")
