@@ -88,7 +88,7 @@ class FakeEngine:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, text, voice, speed):
+    def __call__(self, text, voice, speed, engine, seed):
         self.calls.append(text)
         return np.zeros(len(text) * 240, dtype=np.float32)
 

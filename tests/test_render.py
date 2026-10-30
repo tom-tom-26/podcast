@@ -1,4 +1,7 @@
 import re
+import shutil
+import subprocess
+import sys
 import wave
 
 import numpy as np
@@ -6,7 +9,7 @@ import pytest
 import yaml
 
 from pipeline import render
-from tests.conftest import SMOKE_BUNDLE
+from tests.conftest import SMOKE_BUNDLE, in_voice
 from tests.test_lint import REPO
 
 RATE = 24000
@@ -19,10 +22,14 @@ class FakeEngine:
     def __init__(self):
         self.calls = []
         self.speeds = []
+        self.engines = []
+        self.seeds = []
 
-    def __call__(self, text, voice, speed):
+    def __call__(self, text, voice, speed, engine, seed):
         self.calls.append((text, voice))
         self.speeds.append(speed)
+        self.engines.append(engine)
+        self.seeds.append(seed)
         seconds = len(text) / 100
         return 0.1 + 0.05 * np.sin(np.arange(int(RATE * seconds)) * 2 * np.pi * 220 / RATE)
 
@@ -144,9 +151,9 @@ def test_each_chunk_gets_the_voice_base_speed_with_a_little_jitter(smoke_bundle,
 class PaddedEngine(FakeEngine):
     """A fake engine that, like a real one, leaves half a second of silence at each end."""
 
-    def __call__(self, text, voice, speed):
+    def __call__(self, *args):
         pad = np.zeros(RATE // 2)
-        return np.concatenate([pad, super().__call__(text, voice, speed), pad])
+        return np.concatenate([pad, super().__call__(*args), pad])
 
 
 def test_engine_silence_at_chunk_edges_is_trimmed(smoke_bundle, tmp_path):
@@ -202,3 +209,117 @@ def think_pause_after(bundle, tmp_path, paragraph):
 @pytest.mark.parametrize("question", ["So why does ice float?", "What colour is grass?"])
 def test_a_think_pause_lasts_about_a_second(smoke_bundle, tmp_path, question):
     assert 0.8 <= think_pause_after(smoke_bundle, tmp_path, question) <= 1.3
+
+
+VOICES = yaml.safe_load((REPO / "config" / "voices.yaml").read_text(encoding="utf-8"))["voices"]
+
+
+@pytest.mark.parametrize("voice", ["charles", "alba"])
+def test_a_stretched_pocket_voice_renders_through_pocket_at_its_stretch(
+    smoke_bundle, tmp_path, voice
+):
+    engine, _ = render_smoke(in_voice(smoke_bundle, voice), tmp_path)
+
+    assert set(engine.engines) == {"pocket"}
+    assert {v for _, v in engine.calls} == {voice}
+    stretch = VOICES[voice]["stretch"]
+    assert all(abs(speed - stretch) <= PACING["speed_jitter"] for speed in engine.speeds)
+
+
+def test_a_pocket_render_repeats_its_seeds_for_the_same_bundle_id(smoke_bundle, tmp_path):
+    first, _ = render_smoke(in_voice(smoke_bundle, "charles"), tmp_path / "first")
+    second, _ = render_smoke(smoke_bundle, tmp_path / "second")
+
+    assert first.seeds == second.seeds
+    assert first.speeds == second.speeds
+    assert len(set(first.seeds)) == len(first.seeds)
+
+
+def test_a_pocket_chunk_re_renders_with_a_fresh_seed(smoke_bundle, tmp_path):
+    first, wav = render_smoke(in_voice(smoke_bundle, "alba"), tmp_path)
+    engine = FakeEngine()
+
+    render.rerender_chunk(smoke_bundle, wav, 3, repo=REPO, synthesise=engine)
+
+    assert engine.engines == ["pocket"]
+    assert engine.seeds[0] not in first.seeds
+    assert engine.speeds == [first.speeds[3]]
+
+
+def test_stuart_bell_is_read_at_pocket_pace_with_no_stretch(smoke_bundle, tmp_path):
+    engine, _ = render_smoke(in_voice(smoke_bundle, "stuart_bell"), tmp_path)
+
+    assert set(engine.engines) == {"pocket"}
+    assert set(engine.speeds) == {1.0}
+
+
+def test_bm_lewis_renders_through_kokoro_at_its_base_speed(smoke_bundle, tmp_path):
+    engine, _ = render_smoke(in_voice(smoke_bundle, "bm_lewis"), tmp_path)
+
+    assert set(engine.engines) == {"kokoro"}
+    assert set(engine.seeds) == {None}
+    assert all(abs(speed - 1.12) <= PACING["speed_jitter"] for speed in engine.speeds)
+
+
+def test_a_stretch_below_the_floor_only_warns(smoke_bundle, tmp_path, capsys):
+    repo = tmp_path / "repo"
+    shutil.copytree(REPO / "config", repo / "config")
+    roster = yaml.safe_load((repo / "config" / "voices.yaml").read_text(encoding="utf-8"))
+    roster["voices"]["charles"]["stretch"] = 0.8
+    (repo / "config" / "voices.yaml").write_text(yaml.safe_dump(roster), encoding="utf-8")
+    engine = FakeEngine()
+
+    render.render_bundle(
+        in_voice(smoke_bundle, "charles"), tmp_path / "out.wav", repo=repo, synthesise=engine
+    )
+
+    assert engine.calls
+    assert "below the 0.85 floor" in capsys.readouterr().err
+
+
+def test_a_dry_run_can_read_the_bundle_in_another_roster_voice(smoke_bundle, tmp_path):
+    engine = FakeEngine()
+
+    render.render_bundle(
+        smoke_bundle, tmp_path / "out.wav", repo=REPO, synthesise=engine, voice="alba"
+    )
+
+    assert {v for _, v in engine.calls} == {"alba"}
+    assert (
+        yaml.safe_load(chunk_map(tmp_path / "out.wav").read_text(encoding="utf-8"))["voice"]
+        == "alba"
+    )
+
+
+@pytest.mark.parametrize(
+    "voice, engine",
+    [
+        ("bm_george", "kokoro"),
+        ("bm_lewis", "kokoro"),
+        ("charles", "pocket"),
+        ("alba", "pocket"),
+        ("stuart_bell", "pocket"),
+    ],
+)
+def test_render_names_the_engine_a_voice_needs_so_the_job_installs_only_that(
+    smoke_bundle, voice, engine
+):
+    run = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pipeline",
+            "render",
+            str(smoke_bundle),
+            "--engine",
+            "--voice",
+            voice,
+            "--repo",
+            str(REPO),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.strip() == engine

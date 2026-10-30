@@ -22,7 +22,7 @@ From `docs/wayfinder/research/18-human-feel-and-ai-deslop.md` section 7.
 
 1. Names come from `GLOSSARY.md`. A new domain word goes into the glossary first.
 2. Comments explain why; no comment restates code.
-3. No abstraction until the second real use. The one exception is the `synthesise(text, voice, speed)` seam, because swapping TTS engines is a stated requirement.
+3. No abstraction until the second real use. The one exception is the `synthesise(text, voice, speed, engine, seed)` seam, because swapping TTS engines is a stated requirement.
 4. Commit messages: imperative subject, a body that says why when the change isn't obvious, no file lists, no emoji, attribution lines as the repo requires.
 5. Logs: one line per stage with counts and timings; errors say what failed and on which input (chunk index, Episode id).
 6. Docs: one README a person could read in two minutes. Spec decisions live in `docs/wayfinder/`, not repeated in code docs.
