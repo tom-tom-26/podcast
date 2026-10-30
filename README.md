@@ -25,4 +25,4 @@ pipeline render tests/fixtures/bundles/2026-10-30-smoke --out out/smoke.wav
 pipeline publish tests/fixtures/bundles/2026-10-30-smoke --wav out/smoke.wav --dry-run --out-dir out
 ```
 
-`site` and publishing without `--dry-run` are not built yet. On GitHub, run the publish-episode workflow with a Bundle id and `dry_run` to get the `.m4a` as a workflow artifact.
+`site` is not built yet. On GitHub, run the publish-episode workflow with a Bundle id: with `dry_run` you get the `.m4a` as a workflow artifact; without it the Episode goes up as a Release and is added to `episodes.yaml`, the Episode registry.

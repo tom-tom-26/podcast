@@ -1,0 +1,2 @@
+# The Episode registry. Only the Pipeline writes it, when it publishes an Episode.
+episodes: []
