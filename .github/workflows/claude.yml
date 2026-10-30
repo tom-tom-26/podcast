@@ -1,0 +1,81 @@
+name: claude
+
+# The fallback for when cloud sessions are down: the owner opens an issue labelled episode from
+# the GitHub app, Claude comments the confirm message, and the owner's "@claude go" reply starts
+# a second run that writes the Bundle. Build tickets never mention @claude, so they never start it.
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  claude:
+    # Owner only. The action also refuses anyone without write access, but checking here keeps
+    # a stranger's comment from even starting a runner.
+    if: >-
+      (github.event_name == 'issues'
+        && github.event.label.name == 'episode'
+        && github.event.issue.user.login == github.repository_owner
+        && github.event.sender.login == github.repository_owner)
+      || (github.event_name == 'issue_comment'
+        && !github.event.issue.pull_request
+        && github.event.comment.user.login == github.repository_owner
+        && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    # A research run is estimated at 20-45 runner minutes (research/13 section 4).
+    timeout-minutes: 75
+    concurrency:
+      group: claude-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    # As the action's own example asks. id-token lets it fetch the Claude GitHub App's token, and
+    # the App opens the PR: one opened with GITHUB_TOKEN would never start auto-merge.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      # accuracy.md reads PDFs through pdftotext.
+      - name: Install poppler
+        run: >-
+          command -v pdftotext || (sudo apt-get -o Acquire::Retries=2 update
+          && sudo apt-get -o Acquire::Retries=2 install -y poppler-utils)
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          label_trigger: episode
+          # Keeps tag mode, with its one comment that Claude updates, on the labelled event too,
+          # where a prompt alone would switch to agent mode.
+          track_progress: true
+          claude_args: >-
+            --allowedTools "Skill,Bash,Read,Write,Edit,Glob,Grep,WebSearch,WebFetch"
+          prompt: |
+            This run stands in for a cloud session of the episode Skill (.claude/skills/episode).
+            Use the Skill. The issue's title and body are the summon. Your comment on this
+            issue is the only conversation, and each owner reply starts a fresh run, so read
+            the whole thread first.
+
+            - If the thread holds no confirm message from you yet, do "Before step 1" and step
+              1 only: your comment is the confirm message. Then stop.
+            - If it does, the owner's latest comment is the reply to it. Carry on from step 2,
+              taking the outline, Variant and voice from that confirm message.
+            - A summon that has no confirm step ("add to backlog: X", "bring back episode X",
+              feedback) goes straight to its own steps.
+
+            At step 6, commit on the branch you are on: it is already a claude/ branch made
+            from main, so skip `git checkout -b` and the rebase. Lint, push, then open the PR
+            with the `gh api` call step 6 gives, with head set to this branch and "Closes
+            #${{ github.event.issue.number }}" as the last line of the body. Don't post a
+            "Create a PR" link instead: auto-merge only sees a PR that exists. The final
+            message from step 7 goes in your comment.
