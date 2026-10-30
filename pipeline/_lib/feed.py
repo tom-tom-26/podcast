@@ -107,13 +107,13 @@ def feed_problems(feed: str, base: str, site: Path) -> list[str]:
     if channel is None:
         return problems + ["feed.xml: no <channel>"]
 
-    problems += _empty(channel, CHANNEL_TAGS, "channel")
+    problems += _missing_tags(channel, CHANNEL_TAGS, "channel")
     if not re.fullmatch(r"[a-z]{2}(-[A-Z]{2})?", channel.findtext("language") or ""):
         problems.append("channel: language is not an ISO code such as en-GB")
     categories = [c.get("text") for c in channel.findall("itunes:category", NS)]
     if not categories or any(c not in CATEGORIES for c in categories):
         problems.append(f"channel: itunes:category {categories} is not one of Apple's")
-    problems += _true_or_false(channel, "channel")
+    problems += _explicit_problems(channel, "channel")
     image = channel.find("itunes:image", NS)
     href = image.get("href", "") if image is not None else ""
     if not href.startswith(f"{base}/") or not href.endswith((".png", ".jpg")):
@@ -131,8 +131,8 @@ def feed_problems(feed: str, base: str, site: Path) -> list[str]:
     for item in items:
         guid = item.findtext("guid") or ""
         name = f"item {guid or item.findtext('title')}"
-        problems += _empty(item, ITEM_TAGS, name)
-        problems += _true_or_false(item, name)
+        problems += _missing_tags(item, ITEM_TAGS, name)
+        problems += _explicit_problems(item, name)
         problems += [
             f"{name}: has <{tag}>"
             for tag in ("itunes:episode", "itunes:season")
@@ -193,7 +193,7 @@ def _inline(text: str) -> str:
     )
 
 
-def _empty(element: ET.Element, tags: list[str], name: str) -> list[str]:
+def _missing_tags(element: ET.Element, tags: list[str], name: str) -> list[str]:
     return [
         f"{name}: <{tag}> missing or empty"
         for tag in tags
@@ -201,7 +201,7 @@ def _empty(element: ET.Element, tags: list[str], name: str) -> list[str]:
     ]
 
 
-def _true_or_false(element: ET.Element, name: str) -> list[str]:
+def _explicit_problems(element: ET.Element, name: str) -> list[str]:
     if element.findtext("itunes:explicit", namespaces=NS) not in ("true", "false"):
         return [f"{name}: itunes:explicit is not true or false"]
     return []

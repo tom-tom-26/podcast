@@ -9,7 +9,7 @@ def archive_html(show: dict, items: list[dict]) -> str:
         published = item["published"]
         minutes = max(1, round(item["duration"] / 60))
         rows.append(
-            f'<li><a href="{html.escape(item["release_url"])}">{html.escape(item["title"])}</a>'
+            f'<li><a href="{html.escape(item["download_url"])}">{html.escape(item["title"])}</a>'
             f"<br>{published.day} {published:%B %Y}, {minutes} min"
             f"<br>{html.escape(item['summary'])}</li>"
         )

@@ -58,7 +58,7 @@
 
 **Window**: The Episodes whose audio the Pages site holds, newest first, within the size budget. The Feed lists only these; the Archive page lists every Episode.
 
-**Archive page**: The plain `noindex` page listing every published Episode, newest first, with a link to its Release. The Feed's `link` points here and nothing else links to it.
+**Archive page**: The plain `noindex` page listing every published Episode, newest first, with a download link to its Release. The Feed's `link` points here and nothing else links to it.
 
 **Show config**: `config/show.yaml`, the Feed's channel fields and description.
 

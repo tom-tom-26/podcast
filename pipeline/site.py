@@ -81,7 +81,7 @@ def main(args: argparse.Namespace, github=None) -> int:
                 "published": published,
                 # Q&As number as 7q to 7z, then 7z2, and are bonus items; Parts use a-c.
                 "bonus": re.search("[q-z]", episode["number"]) is not None,
-                "release_url": github.download_url(episode["episode_id"], episode["file"]),
+                "download_url": github.download_url(episode["episode_id"], episode["file"]),
             }
         )
 
@@ -96,9 +96,9 @@ def main(args: argparse.Namespace, github=None) -> int:
                 file=sys.stderr,
             )
             return 1
-    fetched = sum(f.stat().st_size for f in audio.iterdir())
+    fetched_bytes = sum(f.stat().st_size for f in audio.iterdir())
     print(
-        f"site: fetched {len(episodes)} audio files, {fetched / 1e6:.1f} MB, "
+        f"site: fetched {len(episodes)} audio files, {fetched_bytes / 1e6:.1f} MB, "
         f"in {time.perf_counter() - started:.1f} s",
         file=sys.stderr,
     )

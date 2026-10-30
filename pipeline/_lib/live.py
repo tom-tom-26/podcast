@@ -14,9 +14,13 @@ def live_problems(base: str, episodes: list[dict]) -> list[str]:
         feed = ET.fromstring(_get(f"{base}/feed.xml"))
     except (OSError, ET.ParseError) as error:
         return [f"{base}/feed.xml: {error}"]
-    enclosures = {
-        item.findtext("guid"): item.find("enclosure").get("url") for item in feed.iter("item")
-    }
+    enclosures = {}
+    for item in feed.iter("item"):
+        enclosure = item.find("enclosure")
+        if enclosure is None:
+            problems.append(f"Feed item {item.findtext('guid')} has no enclosure")
+        else:
+            enclosures[item.findtext("guid")] = enclosure.get("url")
     expected = {episode["guid"]: episode for episode in episodes}
     problems += [
         f"Feed has guid {guid}, not in the registry" for guid in enclosures.keys() - expected.keys()
