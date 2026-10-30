@@ -6,6 +6,8 @@
 
 **Skill**: The Claude session entry point. Takes a topic, produces a Bundle.
 
+**Cloud session**: A Claude Code session on Anthropic's machines, started from the Claude app, where the Skill normally runs. When cloud sessions are down, the claude workflow runs the Skill from an `episode` issue instead.
+
 **Bundle**: The finished input to the tool for one Episode: Script, metadata, and sources.
 
 **Script**: The spoken text of an Episode, written in the host's voice.
