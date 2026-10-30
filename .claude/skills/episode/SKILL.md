@@ -88,7 +88,7 @@ If you can't make a Bundle pass, don't push. Say what blocks in the final messag
 
 One commit holds the whole run: the Bundle (every Part, for a split Topic), this run's Learnings changes, and nothing outside the auto-merge allow-list. A path outside it leaves the PR for the owner.
 
-First write this run's lessons, `seen` raises and any compaction, to `references/learnings.md`. A smooth run changes nothing in `learnings/`.
+First write this run's lessons, `seen` raises and any compaction into `learnings/`, following `references/learnings.md`. A smooth run changes nothing in `learnings/`.
 
 ```
 git checkout -b claude/<slug> origin/main

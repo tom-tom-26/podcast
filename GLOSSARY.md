@@ -48,7 +48,13 @@
 
 **Higher-risk flag**: The Bundle marker, with a reason, for topics whose content could cause harm if misapplied.
 
-**Source profile**: For one field of topics, what counts as strong evidence, what to watch for, and what triggers the Higher-risk flag. Starter set in research/05 section 13; new ones are saved to Learnings.
+**Source profile**: For one field of topics, what counts as strong evidence, what to watch for, and what triggers the Higher-risk flag. Each sits at the top of its Field file; the starter set came from research/05 section 13. A new one starts as a `draft` and becomes `settled` after a second clean use or the owner's OK.
+
+**Field file**: `learnings/fields/<field>.md`, one per field of topics: its Source profile, then that field's Learnings. `learnings/INDEX.md` matches a Topic to one or two of them.
+
+**Lesson**: One line of Learnings: date, Bundle id, stage, what happened and what to do instead, with a `seen` count and a `source` (`skill` or `owner`). Only the owner removes a `source: owner` lesson.
+
+**Compaction**: The only rewrite of Learnings: when a file grows past its size, duplicate lessons are merged and dead ones dropped, in the same run. Skipped in a run whose push meets a conflict.
 
 **Bundle id**: The name of a Bundle's folder, `<date>-<slug>`, fixed when the Skill writes it. Seeds the render's random draws, each chunk's with its own text, so a re-render sounds the same wherever the Script didn't change.
 

@@ -38,7 +38,7 @@ One line, appended under `## Lessons` of the field file it belongs to, or of `ge
 
 - **Do instead** is always something to do, not a warning.
 - **Saves** is optional: what following it saves, such as "~4 fetches".
-- Use the Bundle id, because the Episode id doesn't exist until the Pipeline publishes.
+- Use the Bundle id, because the Episode id doesn't exist until the Pipeline publishes. The seeded lessons say `planning` instead: they come from before the first Episode.
 - `source: owner` marks a lesson the owner gave. Feedback mode writes those; a normal run writes `source: skill`.
 
 An example:
@@ -51,7 +51,7 @@ An example:
 
 - **A smooth run writes nothing.** There is no minimum.
 - About 3 new lessons per run at most. Keep the ones that would have saved the most.
-- Learnings changes go in the same commit as the Bundle (SKILL.md step 6).
+- Learnings changes go in the same commit as the Bundle (SKILL.md step 6). A run that doesn't push writes nothing to `learnings/`: list the lessons it would have written under "Learned this run", marked not saved, so the owner can add them.
 - When a lesson helped again, raise its `seen` by one. Keep its date.
 - When a lesson you followed turned out wrong or unnecessary, rewrite or delete it in this run. **Firm:** never a `source: owner` lesson; propose the change in the final message instead.
 
@@ -83,21 +83,21 @@ A later run in that field that needed no change to the draft makes it `settled`:
 A file over its size is compacted in the same run: `INDEX.md` at about 300 tokens, `general.md` and each field file at about 1,500. With `wc -w`, that is about 220 and 1,100 words.
 
 - Merge duplicates into one line, adding their `seen` counts.
-- Drop dead lessons: about a host or tool that no longer behaves that way, or no longer needed.
-- Then drop lessons older than about 12 months with `seen: 1`, oldest first.
+- Drop lessons older than about 12 months with `seen: 1` first, oldest first.
+- Then, if it is still over, drop dead lessons: about a host or tool that no longer behaves that way, or no longer needed.
 - **Firm:** never remove or merge away a `source: owner` lesson. Only the owner removes those.
 - Never delete a file; auto-merge refuses a deleted path.
 - Compaction is the only rewrite of Learnings. Skip it in any run that meets a conflict at push.
 
 ## Push conflicts
 
-Learnings lines are append-only, so parallel sessions can each add theirs. If the rebase in step 6 stops on a conflict in a `learnings/` file:
+New lessons are only ever appended, so parallel sessions can each add theirs; only compaction and a wrong lesson remove lines. If the rebase in step 6 stops on a conflict in a `learnings/` file:
 
 ```
 git checkout origin/main -- <file>
 ```
 
-Then re-append this run's own lines to that file (new lessons, a new field file's INDEX row), redo any `seen` raise on top of main's version, drop this run's compaction of it, `git add` it and `git rebase --continue`. Say in "Learned this run" that compaction was skipped.
+Then re-append this run's own lines to that file (new lessons, a new field file's INDEX row), redo any `seen` raise on top of main's version, `git add` it and `git rebase --continue`. Compaction is skipped for the whole run: if this run compacted any other `learnings/` file, take main's version of it too and re-append only this run's lines. Say in "Learned this run" that compaction was skipped.
 
 ## Learned this run
 
