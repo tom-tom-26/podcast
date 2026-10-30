@@ -19,10 +19,25 @@ from tests.test_lint import REPO
 RATE = 24000
 
 
+def quiet_tone_take(wav, seconds=12):
+    """Speech-like enough for loudnorm and the AAC encoder: a noisy tone at about -30 dBFS
+    with gaps, as one chunk. A pure tone encodes far under its target bitrate, which hides the
+    setting; this one stays near 64k on both the CI and local encoders, where a rendered take
+    of the fake engine's audio does not."""
+    t = np.arange(RATE * seconds) / RATE
+    noise = np.random.default_rng(0).normal(0, 0.2, t.size)
+    voiced = np.sin(2 * np.pi * 200 * t) + noise
+    write_wav(wav, 32767 * 0.03 * voiced * (np.sin(2 * np.pi * 0.5 * t) > -0.5))
+    text = "Look up on a clear afternoon and the sky is blue."
+    chunk = {"segment": "Hook", "text": text, "gap": None, "start": 0, "end": t.size}
+    chunk_map = {"bundle": "2026-10-30-smoke", "voice": "bm_george", "rate": RATE,
+                 "chunks": [chunk]}  # fmt: skip
+    render.chunk_map_path(wav).write_text(yaml.safe_dump(chunk_map), encoding="utf-8")
+
+
 class SpeechlikeEngine:
-    """Stands in for a TTS engine with speech-like enough audio for loudnorm and the AAC
-    encoder: a noisy tone at about -30 dBFS, 60 ms per character. A pure tone encodes far
-    under its target bitrate, which hides the setting."""
+    """Stands in for a TTS engine: a noisy tone at about -30 dBFS, 60 ms per character, enough
+    for loudnorm and the gates."""
 
     def __init__(self):
         self.calls = []
@@ -54,6 +69,8 @@ def heard_as_written(wav, drop=None):
 
 
 def test_dry_run_encodes_a_mono_64_kbps_aac_m4a_at_minus_16_lufs(smoke_bundle, tmp_path):
+    quiet_tone_take(tmp_path / "render.wav")
+
     assert publish_episode(smoke_bundle, tmp_path, None, "--dry-run") == 0
 
     out = tmp_path / "out"
