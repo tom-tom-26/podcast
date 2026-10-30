@@ -8,6 +8,8 @@
 
 **Cloud session**: A Claude Code session on Anthropic's machines, started from the Claude app, where the Skill normally runs. When cloud sessions are down, the claude workflow runs the Skill from an `episode` issue instead.
 
+**Shortcut summon**: The optional iOS Shortcut that starts a Cloud session from a typed Topic by firing a scheduled task (`docs/shortcut.md`). The Code tab stays the primary way in.
+
 **Bundle**: The finished input to the tool for one Episode: Script, metadata, and sources.
 
 **Script**: The spoken text of an Episode, written in the host's voice.
