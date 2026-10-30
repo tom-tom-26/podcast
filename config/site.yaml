@@ -1,0 +1,8 @@
+# The Pages site's size rules (ticket 08). GitHub caps a Pages site at 1 GB.
+# The Window: audio kept on Pages, newest first. Soft, so a group of Parts may run past it.
+budget_mb: 600
+# A deploy whose site is bigger than this is refused.
+ceiling_mb: 900
+# Keep Episodes that leave the Window in the Feed, pointing at their stable Release download
+# URL. Off until the real-device test shows Apple Podcasts follows that URL.
+repoint: false

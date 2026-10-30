@@ -87,8 +87,9 @@ def show_notes_html(notes: str) -> str:
     return "".join(blocks)
 
 
-def feed_problems(feed: str, base: str, site: Path) -> list[str]:
-    """What in the built Feed breaks Apple's rules or disagrees with the site's audio."""
+def feed_problems(feed: str, base: str, site: Path, release_urls: set[str]) -> list[str]:
+    """What in the built Feed breaks Apple's rules or disagrees with the site's audio.
+    release_urls are the Release download URLs an item may point at instead of the site."""
     problems = []
     if not feed.startswith(DECLARATION):
         problems.append(f"feed.xml: does not start with {DECLARATION}")
@@ -159,6 +160,8 @@ def feed_problems(feed: str, base: str, site: Path) -> list[str]:
         if url in urls:
             problems.append(f"{name}: enclosure URL used by another item")
         urls.add(url)
+        if url in release_urls:
+            continue
         if not url.isascii() or not url.startswith(f"{base}/"):
             problems.append(f"{name}: enclosure URL {url!r} is not an ASCII URL on this site")
             continue

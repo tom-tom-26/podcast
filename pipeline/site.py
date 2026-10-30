@@ -19,11 +19,14 @@ from pipeline._lib.github import GitHub
 from pipeline._lib.live import live_problems
 from pipeline._lib.registry import REGISTRY, load_registry
 from pipeline._lib.roster import load_roster, with_credit
+from pipeline._lib.window import MB, PIN_LIST, choose_window, load_pins
 
 COVER_SIZE = 3000
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_RGB = 2
 ROBOTS = "User-agent: *\nDisallow: /\n"
+TEST_REGISTRY = "config/test_episodes.yaml"
+TEST_FEED = "test/feed.xml"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -41,13 +44,19 @@ def main(args: argparse.Namespace, github=None) -> int:
     started = time.perf_counter()
     base = args.base_url.rstrip("/")
     episodes = load_registry((args.repo / REGISTRY).read_text(encoding="utf-8"))
+    tests = load_registry((args.repo / TEST_REGISTRY).read_text(encoding="utf-8"))
+    rules = yaml.safe_load((args.repo / "config" / "site.yaml").read_text(encoding="utf-8"))
+    pins = load_pins(args.repo / PIN_LIST)
+    window = choose_window(episodes, pins, rules["budget_mb"] * MB)
+    in_feed = episodes if rules["repoint"] else window
     if args.check:
-        problems = live_problems(base, episodes)
+        feeds = {"feed.xml": in_feed} | ({TEST_FEED: tests} if tests else {})
+        problems = live_problems(base, feeds)
         for problem in problems:
             print(f"site check: {problem}", file=sys.stderr)
         print(
-            f"site check {base}: {len(episodes)} Episodes, {len(problems)} problems "
-            f"in {time.perf_counter() - started:.1f} s",
+            f"site check {base}: {len(in_feed)} Episodes, {len(tests)} test Episodes, "
+            f"{len(problems)} problems in {time.perf_counter() - started:.1f} s",
             file=sys.stderr,
         )
         return 1 if problems else 0
@@ -58,37 +67,33 @@ def main(args: argparse.Namespace, github=None) -> int:
     if args.out.exists() and any(args.out.iterdir()):
         print(f"site: {args.out} is not empty; build into a fresh folder", file=sys.stderr)
         return 1
-    audio = args.out / "audio"
-    audio.mkdir(parents=True, exist_ok=True)
 
-    items = []
-    for episode in reversed(episodes):
-        bundle = args.repo / "bundles" / episode["bundle_id"]
-        meta = load_meta(bundle)
-        notes = with_credit(
-            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, episode["voice"]
-        )
-        published = datetime.fromisoformat(github.published_at(episode["episode_id"]))
-        items.append(
-            {
-                "title": f"Episode {episode['number']}: {meta['title']}",
-                "summary": meta["summary"],
-                "notes": notes,
-                "guid": episode["guid"],
-                "url": f"{base}/audio/{episode['file']}",
-                "bytes": episode["bytes"],
-                "duration": episode["duration"],
-                "published": published,
-                # Q&As number as 7q to 7z, then 7z2, and are bonus items; Parts use a-c.
-                "bonus": re.search("[q-z]", episode["number"]) is not None,
-                "download_url": github.download_url(episode["episode_id"], episode["file"]),
-            }
+    known = {episode["episode_id"] for episode in episodes}
+    for pin in pins:
+        if pin not in known:
+            print(f"site: pinned {pin} is not in the registry; ignored", file=sys.stderr)
+    window_bytes = sum(episode["bytes"] for episode in window)
+    dropped = [episode["episode_id"] for episode in episodes if episode not in window]
+    if dropped or window_bytes > rules["budget_mb"] * MB:
+        print(
+            f"site: warning: the Window is {window_bytes / MB:.1f} MB against a "
+            f"{rules['budget_mb']} MB budget; dropped {', '.join(dropped) or 'nothing'}"
+            + (", which stay in the Feed on their Release URL" if rules["repoint"] else ""),
+            file=sys.stderr,
         )
 
-    # Every Episode is in the Window until the Window ticket adds the size budget.
-    for episode in episodes:
+    # A Feed item's audio is a copy on the site, or else the Release download URL, which is
+    # stable; it redirects to a signed URL that expires, which must never go in a Feed.
+    fetch = [(episode, f"audio/{episode['file']}") for episode in window]
+    fetch += [
+        (episode, f"test/audio/{episode['file']}")
+        for episode in tests
+        if episode.get("enclosure") != "release"
+    ]
+    for episode, path in fetch:
+        (args.out / path).parent.mkdir(parents=True, exist_ok=True)
         try:
-            github.download_asset(episode["episode_id"], episode["file"], audio / episode["file"])
+            github.download_asset(episode["episode_id"], episode["file"], args.out / path)
         except RuntimeError as error:
             print(
                 f"site: could not fetch {episode['file']} for {episode['episode_id']}: {error}; "
@@ -96,25 +101,84 @@ def main(args: argparse.Namespace, github=None) -> int:
                 file=sys.stderr,
             )
             return 1
-    fetched_bytes = sum(f.stat().st_size for f in audio.iterdir())
     print(
-        f"site: fetched {len(episodes)} audio files, {fetched_bytes / 1e6:.1f} MB, "
-        f"in {time.perf_counter() - started:.1f} s",
+        f"site: fetched {len(fetch)} audio files in {time.perf_counter() - started:.1f} s",
         file=sys.stderr,
     )
 
-    feed = build_feed(show, base, items)
+    def item(episode, url, title_prefix=""):
+        bundle = args.repo / "bundles" / episode["bundle_id"]
+        meta = load_meta(bundle)
+        notes = with_credit(
+            (bundle / "show_notes.md").read_text(encoding="utf-8"), roster, episode["voice"]
+        )
+        return {
+            "title": f"{title_prefix}Episode {episode['number']}: {meta['title']}",
+            "summary": meta["summary"],
+            "notes": notes,
+            "guid": episode["guid"],
+            "url": url,
+            "bytes": episode["bytes"],
+            "duration": episode["duration"],
+            "published": datetime.fromisoformat(github.published_at(episode["episode_id"])),
+            # Q&As number as 7q to 7z, then 7z2, and are bonus items; Parts use a-c.
+            "bonus": re.search("[q-z]", episode["number"]) is not None,
+            "download_url": release_url(episode),
+        }
+
+    def release_url(episode):
+        return github.download_url(episode["episode_id"], episode["file"])
+
+    items, in_feed_items = [], []
+    for episode in reversed(episodes):
+        on_site = episode in window
+        items.append(
+            item(episode, f"{base}/audio/{episode['file']}" if on_site else release_url(episode))
+        )
+        if episode in in_feed:
+            in_feed_items.append(items[-1])
+    feed = build_feed(show, base, in_feed_items)
     (args.out / "feed.xml").write_text(feed, encoding="utf-8")
     (args.out / "archive.html").write_text(archive_html(show, items), encoding="utf-8")
     (args.out / "robots.txt").write_text(ROBOTS, encoding="utf-8")
     shutil.copy(args.repo / show["artwork"], args.out / "cover.png")
+    repointed = {release_url(e) for e in in_feed if e not in window}
+    problems = cover_problems(args.out / "cover.png") + feed_problems(
+        feed, base, args.out, repointed
+    )
 
-    problems = cover_problems(args.out / "cover.png") + feed_problems(feed, base, args.out)
+    if tests:
+        test_items = [
+            item(
+                episode,
+                release_url(episode)
+                if episode.get("enclosure") == "release"
+                else f"{base}/test/audio/{episode['file']}",
+                title_prefix="TEST ",
+            )
+            for episode in reversed(tests)
+        ]
+        test_feed = build_feed({**show, "title": f"TEST {show['title']}"}, base, test_items)
+        (args.out / TEST_FEED).parent.mkdir(exist_ok=True)
+        (args.out / TEST_FEED).write_text(test_feed, encoding="utf-8")
+        released = {release_url(e) for e in tests if e.get("enclosure") == "release"}
+        problems += [
+            f"{TEST_FEED}: {problem}"
+            for problem in feed_problems(test_feed, base, args.out, released)
+        ]
+
+    site_bytes = sum(f.stat().st_size for f in args.out.rglob("*") if f.is_file())
+    if site_bytes > rules["ceiling_mb"] * MB:
+        problems.append(
+            f"the site is {site_bytes / MB:.1f} MB, over the {rules['ceiling_mb']} MB ceiling; "
+            "pin fewer Episodes"
+        )
     for problem in problems:
         print(f"site: {problem}", file=sys.stderr)
     print(
-        f"site: Feed with {len(items)} Episodes, {len(problems)} blocking problems, "
-        f"{time.perf_counter() - started:.1f} s in all",
+        f"site: Feed with {len(in_feed_items)} Episodes, {len(window)} in the Window, "
+        f"{len(tests)} test Episodes, site {site_bytes / MB:.1f} MB, "
+        f"{len(problems)} blocking problems, {time.perf_counter() - started:.1f} s in all",
         file=sys.stderr,
     )
     return 1 if problems else 0
