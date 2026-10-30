@@ -62,7 +62,11 @@
 
 **Show config**: `config/show.yaml`, the Feed's channel fields and description.
 
-**Voice roster**: `config/voices.yaml`, each voice's engine and settings, and the credit line a CC BY voice needs.
+**Voice roster**: `config/voices.yaml`, each voice's engine and settings, and the credit line a CC BY voice needs. It also names the default voice (`bm_george`), the stretch floor, and each voice's `suits:` hints, the few words the Skill weighs when it proposes a voice.
+
+**Stretch**: A Pocket voice's WSOLA time-stretch, which sets its pace since Pocket has no speed control. Below 1 is slower. A Pocket voice with no stretch is read at Pocket's own pace. The **stretch floor** (about 0.85, soft) is the slowest stretch that still sounded right in the audition.
+
+**Voice seed**: A Pocket voice's roster seed, mixed with the Bundle id into each chunk's seed. Changing it gives every Episode in that voice a different take.
 
 **Lexicon**: `config/lexicon.yaml`, how each engine should say the terms it gets wrong, plus the `verified:` capitals words every roster voice reads right as written. A Bundle's `pronunciations` use the same entry shape and win for that Episode (research/14).
 
@@ -70,7 +74,7 @@
 
 **Pacing config**: `config/pacing.yaml`, how render cuts a Script into chunks and spaces them: the chunk cap, the gap drawn at each kind of boundary, the `[beat]` and `[think]` lengths, speed jitter and trim. Draws are seeded by the Bundle id.
 
-**Chunk map**: The file render writes beside its WAV, naming each chunk's Segment, text, speed and place in the WAV, so a later stage can name a chunk or re-render it.
+**Chunk map**: The file render writes beside its WAV, naming the voice and each chunk's Segment, text, speed (a Kokoro speed or a Pocket stretch), Pocket seed and place in the WAV, so a later stage can name a chunk or re-render it.
 
 **Feedback mode**: The Skill mode in which the owner gives free-text reactions or instructions about published Episodes; the Skill routes each one to where it changes future Episodes, or to a Correction (ticket 16).
 

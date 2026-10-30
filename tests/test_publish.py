@@ -13,6 +13,7 @@ import pytest
 import yaml
 
 from pipeline import publish
+from tests.conftest import in_voice
 from tests.fake_github import FakeGitHub
 
 RATE = 24000
@@ -204,13 +205,6 @@ def integrated_loudness(path):
         check=True,
     )
     return float(re.findall(r"I:\s+(-?[\d.]+) LUFS", run.stderr)[-1])
-
-
-def in_voice(bundle, voice):
-    meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
-    meta["voice"] = voice
-    (bundle / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
-    return bundle
 
 
 @pytest.mark.parametrize(

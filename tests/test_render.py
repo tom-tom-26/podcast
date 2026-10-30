@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from pipeline import render
-from tests.conftest import SMOKE_BUNDLE
+from tests.conftest import SMOKE_BUNDLE, in_voice
 from tests.test_lint import REPO
 
 RATE = 24000
@@ -211,14 +211,7 @@ def test_a_think_pause_lasts_about_a_second(smoke_bundle, tmp_path, question):
     assert 0.8 <= think_pause_after(smoke_bundle, tmp_path, question) <= 1.3
 
 
-ROSTER = yaml.safe_load((REPO / "config" / "voices.yaml").read_text(encoding="utf-8"))["voices"]
-
-
-def in_voice(bundle, voice):
-    meta = yaml.safe_load((bundle / "meta.yaml").read_text(encoding="utf-8"))
-    meta["voice"] = voice
-    (bundle / "meta.yaml").write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")
-    return bundle
+VOICES = yaml.safe_load((REPO / "config" / "voices.yaml").read_text(encoding="utf-8"))["voices"]
 
 
 @pytest.mark.parametrize("voice", ["charles", "alba"])
@@ -229,8 +222,7 @@ def test_a_stretched_pocket_voice_renders_through_pocket_at_its_stretch(
 
     assert set(engine.engines) == {"pocket"}
     assert {v for _, v in engine.calls} == {voice}
-    stretch = ROSTER[voice]["stretch"]
-    assert 0.85 <= stretch < 1
+    stretch = VOICES[voice]["stretch"]
     assert all(abs(speed - stretch) <= PACING["speed_jitter"] for speed in engine.speeds)
 
 
@@ -251,6 +243,7 @@ def test_a_pocket_chunk_re_renders_with_a_fresh_seed(smoke_bundle, tmp_path):
 
     assert engine.engines == ["pocket"]
     assert engine.seeds[0] not in first.seeds
+    assert engine.speeds == [first.speeds[3]]
 
 
 def test_stuart_bell_is_read_at_pocket_pace_with_no_stretch(smoke_bundle, tmp_path):

@@ -44,7 +44,9 @@ def main(args: argparse.Namespace) -> int:
         print(_settings(args.bundle, load_roster(args.repo), voice)["engine"])
         return 0
     if args.out is None:
-        print("render: --out is needed unless --engine is given", file=sys.stderr)
+        print(
+            f"render {args.bundle.name}: --out is needed unless --engine is given", file=sys.stderr
+        )
         return 2
     render_bundle(args.bundle, args.out, args.repo, voice=args.voice)
     return 0
@@ -78,7 +80,7 @@ def render_bundle(
     for chunk in plan:
         chunk["gap_seconds"] = draw_gap(rng, pacing["gaps"][chunk["gap"]]) if chunk["gap"] else 0
         _draw_voice(rng, chunk, settings, pacing)
-    _warn_below_floor(bundle, plan, settings, roster)
+    _warn_below_floor(bundle, settings, roster.get("stretch_floor", 0))
     timeline: list[np.ndarray] = []
     at = 0
     for index, chunk in enumerate(plan):
@@ -105,8 +107,8 @@ def rerender_chunk(
     repo: Path = Path("."),
     synthesise: Callable[..., np.ndarray] = synthesise,
 ) -> None:
-    """Render one chunk of a rendered WAV again with a fresh speed draw (and a fresh seed for
-    Pocket), for a gate that named it. Gaps and every other chunk stay as they were."""
+    """Render one chunk of a rendered WAV again, for a gate that named it: Kokoro with a
+    fresh speed draw, Pocket with a fresh seed. Gaps and every other chunk stay as they were."""
     started = time.perf_counter()
     meta = load_meta(bundle)
     roster = load_roster(repo)
@@ -120,7 +122,12 @@ def rerender_chunk(
     # Seeded by the retry count too, so a retry is repeatable but never the first draw again.
     chunk["retries"] = chunk.get("retries", 0) + 1
     rng = random.Random(f"{bundle.name}:{index}:{chunk['retries']}")
-    _draw_voice(rng, chunk, settings, pacing)
+    # Kokoro is deterministic, so only a new speed changes its take; Pocket gets a new take
+    # of the same stretch.
+    if settings["engine"] == "pocket":
+        chunk["seed"] = _pocket_seed(rng, settings)
+    else:
+        chunk["speed"] = draw_speed(rng, settings, pacing)
     say = _speaker(bundle, repo, meta, voice, settings, pacing, synthesise)
     audio = say(index, chunk)
     with wave.open(str(wav)) as old:
@@ -147,19 +154,22 @@ def _settings(bundle: Path, roster: dict, voice: str) -> dict:
 
 def _draw_voice(rng: random.Random, chunk: dict, settings: dict, pacing: dict) -> None:
     chunk["speed"] = draw_speed(rng, settings, pacing)
-    # Pocket samples, so each chunk gets its own seed; the roster's seed re-rolls a voice.
-    # Kokoro is deterministic and draws none, which leaves its gaps as they were.
+    # Kokoro is deterministic and draws no seed, which leaves its gaps as they were.
     if settings["engine"] == "pocket":
-        chunk["seed"] = rng.getrandbits(32) ^ settings.get("seed", 0)
+        chunk["seed"] = _pocket_seed(rng, settings)
 
 
-def _warn_below_floor(bundle: Path, plan: list[dict], settings: dict, roster: dict) -> None:
-    floor = roster.get("stretch_floor", 0)
-    slow = [c for c in plan if settings["engine"] == "pocket" and c["speed"] < floor]
-    if slow:
+def _pocket_seed(rng: random.Random, settings: dict) -> int:
+    # Pocket samples, so each chunk gets its own seed; the roster's seed re-rolls a voice.
+    return rng.getrandbits(32) ^ settings.get("seed", 0)
+
+
+def _warn_below_floor(bundle: Path, settings: dict, floor: float) -> None:
+    stretch = settings.get("stretch")
+    if stretch is not None and stretch < floor:
         print(
-            f"render {bundle.name}: {len(slow)} chunks stretched below the {floor} floor, "
-            f"down to {min(c['speed'] for c in slow):.3f}; the roster's stretch wants raising",
+            f"render {bundle.name}: stretch {stretch} is below the {floor} floor; "
+            "slower stretches sounded wrong in the audition",
             file=sys.stderr,
         )
 
