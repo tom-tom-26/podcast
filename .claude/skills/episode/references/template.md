@@ -1,6 +1,8 @@
 # Episode template and style guide
 
-research/05 as the owner signed it off: section 12 with the 12.11 softenings applied, plus the parts of sections 2-5 that section 12 left standing. `style_guide_version: 1`. Every number here is soft, about ±25%, unless marked **firm**.
+research/05 as the owner signed it off: section 12 with the 12.11 softenings applied, plus the parts of sections 2-5 that section 12 left standing. Every number here is soft, about ±25%, unless marked **firm**.
+
+The Template tunables, `config/template.yaml`, hold the numbers the owner can change by instruction in Feedback mode: the Variant ranges and typical lengths, the Segment and listener-question counts, the wpm budget, the Parts thresholds, and `style_guide_version`. Where that file and the table below differ, the file wins: the owner changed it since this was written.
 
 ## Variants and length
 
@@ -132,10 +134,10 @@ voice: bm_george                        # a roster voice
 risk_flag: false                        # true for a Higher-risk Episode
 risk_reason: null                       # one line when flagged
 pronunciations: []                      # Lexicon entries for this Episode only (tts.md)
-wpm_budget: 165
+wpm_budget: 165                         # wpm_budget in config/template.yaml
 target_words: 4100                      # what you aimed for
 spoken_words: 3980                      # what the Script has, markup excluded
-style_guide_version: 1
+style_guide_version: 1                  # the version in config/template.yaml
 deslop_version: 1                       # the version in config/deslop_rules.yaml
 parent_episode: null                    # a Q&A: the parent's episode_id (qa.md)
 questions: []                           # a Q&A: the owner's questions, word for word

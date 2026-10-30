@@ -12,6 +12,7 @@ from pipeline._lib.bundle import bundle_problems, load_meta
 from pipeline._lib.lexicon import load_lexicon, phonemize
 from pipeline._lib.rules import (
     claim_problems,
+    correction_warnings,
     ledger_ids,
     ledger_warnings,
     pace_warnings,
@@ -36,7 +37,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--repo",
         type=Path,
         default=Path("."),
-        help="the repo checkout, for the phrase list, the Lexicon and the Episode registry",
+        help="the repo checkout, for the phrase list, the Template tunables, the Lexicon and "
+        "the Episode registry",
     )
     parser.add_argument(
         "--pron-check",
@@ -56,6 +58,7 @@ def main(args: argparse.Namespace) -> int:
     phrase_list = yaml.safe_load(
         (args.repo / "config" / "deslop_rules.yaml").read_text(encoding="utf-8")
     )
+    tunables = yaml.safe_load((args.repo / "config" / "template.yaml").read_text(encoding="utf-8"))
     problems = bundle_problems(bundle)
     warnings = []
     # Later rules need the fields; a broken meta.yaml is already reported above.
@@ -95,7 +98,7 @@ def main(args: argparse.Namespace) -> int:
             questions = qa if isinstance(qa, list) else None
             warnings += style_warnings(segments, meta and meta["variant"], lexicon, questions)
             if meta:
-                warnings += pace_warnings(segments, meta)
+                warnings += pace_warnings(segments, meta, tunables)
     if meta:
         listing = [(f"meta.yaml {key}", meta[key]) for key in ("title", "summary")]
         blockable += listing
@@ -119,6 +122,10 @@ def main(args: argparse.Namespace) -> int:
         )
     ]
 
+    # Only a schema-valid list is read; a broken one already blocks.
+    if meta and not any(p.startswith("meta.yaml: corrections") for p in problems):
+        script_segments = segments if "script.md" in texts else None
+        warnings += correction_warnings(script_segments, meta, texts.get("show_notes.md", ""))
     warnings += shared_run_warnings(bundle)
     if not any(p.startswith("lint_report.yaml") for p in problems):
         write_report(bundle / "lint_report.yaml", warnings)
